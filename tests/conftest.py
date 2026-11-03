@@ -10,6 +10,14 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
 import helpers  # noqa: E402
+from vega_annotator import shims  # noqa: E402
+
+# On Windows the app switches on its file layer at start (home.main, annotator_boot.main): retries
+# while another reader holds a file, file locks, link fallbacks. The tests run with it too.
+# Without it, a test of two computers claiming a project at once met a sharing violation that the
+# app itself retries through.
+if sys.platform == "win32":
+    shims.install()
 
 
 @pytest.fixture(autouse=True)
