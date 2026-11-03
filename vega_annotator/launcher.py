@@ -98,6 +98,18 @@ def open_browser(url=HOME_URL):
     webbrowser.open(url)
 
 
+def show_message_box(message):
+    """Show a Windows message box and wait for the person to close it.
+
+    Parameters:
+        message: the sentence to show.
+    Returns:
+        None.
+    """
+    import ctypes
+    ctypes.windll.user32.MessageBoxW(0, message, "VEGA Annotator", 0x10)
+
+
 def report_failure(message):
     """Tell the person a start failed. pythonw has no console, so Windows gets a message box.
 
@@ -109,8 +121,7 @@ def report_failure(message):
     if sys.stderr is not None:
         print(message, file=sys.stderr)
     if os.name == "nt":
-        import ctypes
-        ctypes.windll.user32.MessageBoxW(0, message, "VEGA Annotator", 0x10)
+        show_message_box(message)
 
 
 def main():

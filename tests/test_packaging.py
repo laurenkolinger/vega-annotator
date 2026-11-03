@@ -184,13 +184,19 @@ def test_launcher_replaces_a_home_from_another_version(monkeypatch):
 
 
 def test_launcher_says_where_to_look_when_home_will_not_start(monkeypatch, capsys):
+    shown = []
+    monkeypatch.setattr(launcher, "show_message_box", shown.append)
     monkeypatch.setattr(launcher, "running_version", lambda url=None: "")
     monkeypatch.setattr(launcher, "start_home", lambda: None)
     monkeypatch.setattr(launcher, "START_WAIT_S", 0)
     assert launcher.main() == 1
     assert "home.log" in capsys.readouterr().err
+    assert len(shown) == (1 if launcher.os.name == "nt" else 0)
 
 
 def test_launcher_failure_survives_having_no_console(monkeypatch):
+    shown = []
+    monkeypatch.setattr(launcher, "show_message_box", shown.append)
     monkeypatch.setattr(launcher.sys, "stderr", None)
     launcher.report_failure("It did not start.")
+    assert shown == (["It did not start."] if launcher.os.name == "nt" else [])

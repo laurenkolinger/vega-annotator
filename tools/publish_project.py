@@ -298,6 +298,21 @@ def write_json(path, payload):
     os.replace(tmp, path)
 
 
+def clear_leftovers(dest, run):
+    """Remove staging folders a stopped copy of this project left behind.
+
+    Parameters:
+        dest: the projects/ folder.
+        run: the run_* name.
+    Returns:
+        None.
+    """
+    prefix = ".publishing_%s_" % run
+    for name in os.listdir(dest):
+        if name.startswith(prefix):
+            shutil.rmtree(os.path.join(dest, name), ignore_errors=True)
+
+
 def append_log(dest, row):
     """Add one row to publish_log.csv, writing the header on first use.
 
@@ -335,7 +350,7 @@ def holds_laptop_work(state):
 
 
 def publish(project, dest, by, update=False, force=False, dry_run=False, repo=VEGA_REPO, proc_root="/proc",
-            root=DEFAULT_ROOT, replace_laptop_work=False):
+            root=DEFAULT_ROOT, replace_laptop_work=False, purpose=""):
     """Copy one project to the server folder.
 
     Parameters:
@@ -349,8 +364,10 @@ def publish(project, dest, by, update=False, force=False, dry_run=False, repo=VE
         proc_root: the /proc folder, passed in so tests can fake it.
         root: VEGA's inprocess/ folder, for the prior screening refresh.
         replace_laptop_work: replace a copy holding laptop work VEGA has not taken back.
+        purpose: why, in the person's words, for the copy's history.
     Returns:
-        dict: run, files, bytes, rev, dest, and screening_note.
+        dict: run, files, bytes, rev, dest, screening_note, and log_note when the log
+        line could not be written.
     Raises:
         PublishError: when it cannot go ahead, saying why.
     """
@@ -387,6 +404,7 @@ def publish(project, dest, by, update=False, force=False, dry_run=False, repo=VE
         return {"run": run, "files": len(files), "bytes": total, "rev": previous_rev + 1, "dest": target,
                 "dry_run": True}
     os.makedirs(dest, exist_ok=True)
+    clear_leftovers(dest, run)
     if shutil.disk_usage(dest).free < total + FREE_SPACE_MARGIN_BYTES:
         raise PublishError("%s has too little free space for %.1f GB." % (dest, total / 1e9))
     working = os.path.join(dest, ".publishing_%s_%s" % (run, uuid.uuid4().hex[:8]))
@@ -410,8 +428,10 @@ def publish(project, dest, by, update=False, force=False, dry_run=False, repo=VE
                        "published_at": now_ast(), "published_by": by, "vega_commit": vega_commit(repo)},
             "left_on_mainframe": list(LEFT_ON_MAINFRAME),
             "prior_screening_note": screening_note,
-            "frame_hashes": frame_hashes(project), "out": None,
-            "history": [{"at": now_ast(), "action": "publish", "by": by, "files": len(files)}]})
+            # The baseline comes from the copy itself, so a save in VEGA during the copy cannot
+            # make the copy look edited, or hide VEGA's edit, at the next import.
+            "frame_hashes": frame_hashes(working), "out": None,
+            "history": [{"at": now_ast(), "action": "publish", "by": by, "purpose": purpose, "files": len(files)}]})
         if os.path.exists(target):
             stamp = datetime.now(AST).strftime("%Y%m%d-%H%M%S")
             superseded = os.path.join(dest, "_superseded", stamp)
@@ -421,10 +441,14 @@ def publish(project, dest, by, update=False, force=False, dry_run=False, repo=VE
     except BaseException:
         shutil.rmtree(working, ignore_errors=True)
         raise
-    append_log(dest, {"at": now_ast(), "by": by, "run": run, "rev": previous_rev + 1, "files": len(files),
-                      "bytes": total, "vega_commit": vega_commit(repo)})
+    log_note = ""
+    try:
+        append_log(dest, {"at": now_ast(), "by": by, "run": run, "rev": previous_rev + 1, "files": len(files),
+                          "bytes": total, "vega_commit": vega_commit(repo)})
+    except OSError as exc:
+        log_note = "The copy is in place, and publish_log.csv could not be written: %s" % exc
     return {"run": run, "files": len(files), "bytes": total, "rev": previous_rev + 1, "dest": target,
-            "screening_note": screening_note}
+            "screening_note": screening_note, "log_note": log_note}
 
 
 def main(argv=None):
@@ -440,6 +464,7 @@ def main(argv=None):
     parser.add_argument("--root", default=DEFAULT_ROOT)
     parser.add_argument("--dest", required=True)
     parser.add_argument("--by", required=True)
+    parser.add_argument("--purpose", default="")
     parser.add_argument("--update", action="store_true")
     parser.add_argument("--replace-laptop-work", action="store_true")
     parser.add_argument("--force", action="store_true")
@@ -448,7 +473,7 @@ def main(argv=None):
     project = args.project if os.path.isabs(args.project) else os.path.join(args.root, args.project)
     started = time.time()
     try:
-        result = publish(project, args.dest, args.by, update=args.update, force=args.force,
+        result = publish(project, args.dest, args.by, update=args.update, force=args.force, purpose=args.purpose,
                          dry_run=args.dry_run, root=args.root, replace_laptop_work=args.replace_laptop_work)
     except (PublishError, OSError) as exc:
         print("publish_project: %s" % exc, file=sys.stderr)
@@ -457,8 +482,9 @@ def main(argv=None):
     print("%s %s: %d files, %.2f GB, revision %d, to %s (%.0f s)" % (
         verb, result["run"], result["files"], result["bytes"] / 1e9, result["rev"], result["dest"],
         time.time() - started))
-    if result.get("screening_note"):
-        print("Note: " + result["screening_note"])
+    for note in (result.get("screening_note"), result.get("log_note")):
+        if note:
+            print("Note: " + note)
     return 0
 
 

@@ -168,3 +168,41 @@ def test_main_reports_failure_on_stderr(tmp_path, capsys):
     code = tool.main(["--project", str(tmp_path / "run_missing"), "--dest", str(tmp_path / "d"), "--by", "LO"])
     assert code == 1
     assert "cannot be read" in capsys.readouterr().err
+
+
+def test_the_baseline_comes_from_the_copy_even_when_vega_saves_mid_copy(tmp_path, source_project, monkeypatch):
+    store = source_project / tool.SEGMENTATIONS_REL
+    real = tool.copy_with_hash
+
+    def vega_saves_after_the_store_is_copied(src, dest):
+        result = real(src, dest)
+        if src.endswith("segmentations.json"):
+            data = json.loads(store.read_text(encoding="utf-8"))
+            data[sorted(data)[0]]["note_from_vega"] = "saved during the copy"
+            store.write_text(json.dumps(data), encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(tool, "copy_with_hash", vega_saves_after_the_store_is_copied)
+    tool.publish(str(source_project), str(tmp_path / "dest"), "LO", **PUBLISH)
+    copy = tmp_path / "dest" / source_project.name
+    record = json.loads((copy / tool.SERVER_STATE).read_text(encoding="utf-8"))
+    assert record["frame_hashes"] == tool.frame_hashes(str(copy))
+    assert record["frame_hashes"] != tool.frame_hashes(str(source_project))
+
+
+def test_a_log_that_cannot_be_written_leaves_a_finished_copy(tmp_path, source_project, monkeypatch):
+    def log_fails(*_args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(tool, "append_log", log_fails)
+    result = tool.publish(str(source_project), str(tmp_path / "dest"), "LO", purpose="label on a laptop", **PUBLISH)
+    record = json.loads((tmp_path / "dest" / source_project.name / tool.SERVER_STATE).read_text(encoding="utf-8"))
+    assert "could not be written" in result["log_note"] and record["history"][0]["purpose"] == "label on a laptop"
+
+
+def test_a_stopped_copy_leaves_nothing_behind_for_the_next_one(tmp_path, source_project):
+    dest = tmp_path / "dest"
+    (dest / f".publishing_{source_project.name}_dead1234").mkdir(parents=True)
+    (dest / ".publishing_run_other_keep5678").mkdir()
+    tool.publish(str(source_project), str(dest), "LO", **PUBLISH)
+    assert sorted(p.name for p in dest.iterdir() if p.name.startswith(".publishing")) == [".publishing_run_other_keep5678"]
