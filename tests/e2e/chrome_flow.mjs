@@ -33,7 +33,8 @@ async function clickSelector(sessionId, selector) {
   const box = await until('element ' + selector, () => evaluate(sessionId, `(() => {
     const el = document.querySelector(${JSON.stringify(selector)});
     if (!el || el.disabled) return null;
-    el.scrollIntoView({ block: 'center' });
+    // Instant, because the page scrolls smoothly and a click mid-scroll lands somewhere else.
+    el.scrollIntoView({ block: 'center', behavior: 'instant' });
     const r = el.getBoundingClientRect();
     return r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
   })()`));
