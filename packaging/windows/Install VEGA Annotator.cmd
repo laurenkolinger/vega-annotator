@@ -10,4 +10,6 @@ if errorlevel 1 (
 )
 echo.
 echo VEGA Annotator is installed. It opens now, and there is a shortcut on your desktop.
-timeout /t 5 > nul
+rem A pause that also works with no console, where timeout refuses to run.
+ping -n 6 127.0.0.1 > nul
+exit /b 0

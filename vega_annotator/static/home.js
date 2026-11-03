@@ -50,7 +50,9 @@
 
   function sizeText(bytes) {
     if (bytes == null) return "";
-    return bytes < 1e8 ? Math.round(bytes / 1e6) + " MB" : (bytes / 1e9).toFixed(2) + " GB";
+    if (bytes < 1e8) return Math.round(bytes / 1e6) + " MB";
+    if (bytes < 1e10) return (bytes / 1e9).toFixed(2) + " GB";
+    return bytes < 1e12 ? Math.round(bytes / 1e9) + " GB" : (bytes / 1e12).toFixed(1) + " TB";
   }
 
   function statsLine(card) {
