@@ -1,0 +1,2 @@
+# VEGA's files are copied byte for byte, and a parity test checks their checksums.
+vendor/** -text

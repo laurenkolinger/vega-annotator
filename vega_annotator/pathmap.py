@@ -11,6 +11,7 @@ import csv
 import io
 import json
 import os
+import re
 from pathlib import Path
 
 STEP4_DIR = "step4test_combinedAnnotate"
@@ -37,6 +38,10 @@ class PathMap:
         """
         self.server_root = str(server_root).rstrip("/")
         self.local_root = str(local_root).rstrip("/\\")
+        # A local root with a drive letter or a backslash is a Windows path, and the paths
+        # under it keep that form. Any other root is written with forward slashes everywhere.
+        windows = "\\" in self.local_root or re.match(r"^[A-Za-z]:", self.local_root) is not None
+        self.local_sep = "\\" if windows else "/"
 
     def to_local(self, value):
         """Return value with the server root replaced by the local root.
@@ -51,7 +56,7 @@ class PathMap:
             return self.local_root
         if value.startswith(self.server_root + "/"):
             rest = value[len(self.server_root) + 1:]
-            return os.path.join(self.local_root, *rest.split("/"))
+            return self.local_root + self.local_sep + rest.replace("/", self.local_sep)
         return value
 
     def to_server(self, value):

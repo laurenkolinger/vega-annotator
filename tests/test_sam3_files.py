@@ -1,6 +1,7 @@
 """Tests for installing SAM3 from the server folder, and tools/publish_sam3.py."""
 
 import json
+import os
 
 import pytest
 
@@ -22,7 +23,11 @@ def make_cache(root):
     (cache / "refs").mkdir()
     (cache / "refs" / "main").write_text(COMMIT, encoding="utf-8")
     (blobs / "aaa").write_bytes(b"weights" * 1000)
-    (snapshot / "model.safetensors").symlink_to("../../blobs/aaa")
+    if os.name == "nt":
+        # A Windows test machine may refuse links, and the tool reads a plain file the same way.
+        (snapshot / "model.safetensors").write_bytes(b"weights" * 1000)
+    else:
+        (snapshot / "model.safetensors").symlink_to("../../blobs/aaa")
     (snapshot / "config.json").write_text("{}", encoding="utf-8")
     return cache
 

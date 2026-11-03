@@ -57,7 +57,7 @@ def test_bring_in_copies_rewrites_and_claims(published):
     store = json.loads((project / pathmap.SEGMENTATIONS_REL).read_text(encoding="utf-8"))
     for frame in store.values():
         assert Path(frame["image_path_abs"]).is_file()
-    assert (project / pathmap.DATA_YAML_REL).read_text(encoding="utf-8").startswith(f"path: {project}/")
+    assert (project / pathmap.DATA_YAML_REL).read_text(encoding="utf-8").startswith(f"path: {project}{os.sep}")
     assert record["access_log"][-1]["action"] == "bring_in"
     state = server_state(published)
     assert state["out"]["computer"] == COMPUTER and state["out"]["initials"] == "AT"
