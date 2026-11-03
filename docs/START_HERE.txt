@@ -1,0 +1,60 @@
+VEGA Annotator
+
+VEGA's annotator on your own computer. It has the same screen, keys, and SAM3 as on the
+mainframe, so you can label when the mainframe is busy. Your work goes back to this server
+folder when you are done.
+
+
+INSTALL (once per computer, about 15 minutes)
+
+The same installers are at https://github.com/laurenkolinger/vega-annotator/releases/latest
+
+1. Connect the server to your computer, and open your folder on it.
+
+2. Open the install folder here.
+   Mac with an Apple chip: double-click VEGAAnnotator-1.0.0.pkg. If macOS blocks it, open
+   System Settings, Privacy & Security, click Open Anyway, and run it again.
+   Windows: copy VEGAAnnotator-1.0.0-Windows.zip to your computer, unzip it, and
+   double-click "Install VEGA Annotator.cmd". If Windows warns you, click More info, then
+   Run anyway.
+
+3. Let it download Python and PyTorch when it asks. This takes about 1 GB on a Mac and about
+   4 GB on a Windows computer with an NVIDIA card.
+
+4. The home screen opens in your browser. Click CHOOSE FOLDER and pick this VEGA_Annotator
+   folder on the server.
+
+5. Click INSTALL SAM3. This copies 3.4 GB from this folder.
+
+6. Click TEST SAM3. It tells you how long a frame takes on this computer.
+
+
+LABEL
+
+1. On the home screen, click BRING IN on your project. The project copies to your computer
+   and is marked as in use there, so you can then work with the server disconnected.
+
+2. Click OPEN, then Open Annotator. Everything from here works as it does in VEGA.
+
+3. Export each batch as usual. VEGA's checks and your initials work the same way.
+
+
+WHEN YOU ARE DONE
+
+Connect the server, open the project, and click Put Back on the left. It sends your work to
+this folder, and checks every file it sends.
+
+Put Back before you switch computers. If a project says it is in use on another computer,
+go put it back from there.
+
+If Put Back says your work is saved beside the project, the server copy changed while you
+were working. Nothing is lost: your work is in that project's conflicts folder. Tell Lauren,
+then click BRING IN to get the server's copy.
+
+
+PROBLEMS
+
+Annotator logs are in your account:
+  Mac:     ~/Library/Application Support/VEGA Annotator/logs/
+  Windows: %LOCALAPPDATA%\VEGA Annotator\logs\
+Send them to Lauren with what you were doing.

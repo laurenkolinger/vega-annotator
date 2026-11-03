@@ -1,0 +1,4 @@
+# Apple silicon Macs. PyPI's PyTorch builds for macOS use Metal.
+-r base.txt
+torch==2.11.0
+torchvision==0.26.0

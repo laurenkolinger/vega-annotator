@@ -1,0 +1,12 @@
+#!/bin/bash
+# Put VEGA Annotator in the Dock and open it, for a person at the installer window. The app
+# downloads what it needs on that first open. A command-line install does neither.
+APP="$HOME/Applications/VEGA Annotator.app"
+if [ -z "${COMMAND_LINE_INSTALL:-}" ]; then
+  if ! defaults read com.apple.dock persistent-apps 2>/dev/null | grep -q "VEGA%20Annotator"; then
+    defaults write com.apple.dock persistent-apps -array-add "<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>$APP</string><key>_CFURLStringType</key><integer>0</integer></dict></dict></dict>" || true
+    killall Dock || true
+  fi
+  open "$APP" || true
+fi
+exit 0

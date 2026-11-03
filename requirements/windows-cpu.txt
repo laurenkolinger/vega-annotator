@@ -1,0 +1,4 @@
+# Windows with no usable NVIDIA card. PyPI's PyTorch builds for Windows run on the CPU.
+-r base.txt
+torch==2.11.0
+torchvision==0.26.0

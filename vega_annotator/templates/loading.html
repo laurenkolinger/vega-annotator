@@ -1,0 +1,50 @@
+<!doctype html>
+{#- Holds the annotator's window while SAM3 loads, in the look of VEGA's own opening overlay. -#}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Opening the annotator</title>
+  <link rel="stylesheet" href="/static/fonts.css">
+  <link rel="stylesheet" href="/static/vicarius_workflow.css">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .open-ui-modal { background: var(--surface); border: 1px solid var(--magenta); border-radius: var(--radius-lg); padding: 22px 26px; max-width: 520px; margin: 18vh auto 0; text-align: center; }
+    .open-ui-modal .spinner { width: 34px; height: 34px; margin: 0 auto 14px; border: 3px solid var(--border); border-top-color: var(--magenta); border-radius: 50%; animation: open-ui-spin 0.8s linear infinite; }
+    @keyframes open-ui-spin { to { transform: rotate(360deg); } }
+    .open-ui-modal .msg { color: var(--text); font-size: 14px; }
+    .open-ui-modal .sub { color: var(--text-dim); font-size: 13px; margin-top: 8px; white-space: pre-wrap; text-align: left; overflow-wrap: anywhere; }
+    .open-ui-modal.error { border-color: var(--error); }
+    .open-ui-modal.error .spinner { display: none; }
+    .open-ui-modal.error .msg { color: var(--error); }
+  </style>
+</head>
+<body>
+  <div class="open-ui-modal" id="modal">
+    <div class="spinner"></div>
+    <div class="msg" id="msg">Loading SAM3 for {{ run[4:] }}</div>
+    <div class="sub" id="sub"></div>
+  </div>
+  <script>
+    (function () {
+      "use strict";
+      var RUN = {{ run|tojson }};
+      var POLL_MS = 700;
+      var seenStart = false;
+      function poll() {
+        fetch("/api/annotator").then(function (response) { return response.json(); }).then(function (status) {
+          if (status.run === RUN && status.state === "ready" && status.url) { location.replace(status.url); return; }
+          if (status.run === RUN) seenStart = true;
+          if (status.state === "failed" || (seenStart && status.run !== RUN)) {
+            document.getElementById("modal").classList.add("error");
+            document.getElementById("msg").textContent = "The annotator did not start.";
+            document.getElementById("sub").textContent = status.log || "";
+            return;
+          }
+          setTimeout(poll, POLL_MS);
+        }).catch(function () { setTimeout(poll, POLL_MS); });
+      }
+      poll();
+    })();
+  </script>
+</body>
+</html>

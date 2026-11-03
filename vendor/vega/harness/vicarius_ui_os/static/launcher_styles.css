@@ -1,0 +1,296 @@
+
+.launcher-hero {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 1.5rem;
+  margin: 1.5rem 0 2rem;
+}
+/* Every launcher carries .launcher-hero-solo (no New Project panel), so its one
+   panel uses the full width and the two-column hero grid is never in play. */
+.launcher-hero-solo { grid-template-columns: 1fr; }
+.launcher-hero-panel {
+  background: var(--gray-2);
+  border: 1px solid rgba(255, 179, 217, 0.2);
+  padding: 1.4rem;
+}
+.launcher-note {
+  max-inline-size: 80ch; /* F4: prose keeps its measure in a full-width panel */
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--light-dim);
+  line-height: 1.55;
+  margin: 0 0 1rem;
+}
+.launcher-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+/* The loaded / unloaded chip of a laddered module: the card chip's look, at
+   the 12 px legibility floor (workflow design, section 3). */
+.launcher-actions .launcher-chip { font-size: 12px; }
+.launcher-chip.live { color: var(--ok); border-color: var(--ok); }
+/* Stop shows only while VICARIUS can end the server; the button class's
+   inline-flex would otherwise override the hidden attribute. */
+#stop-btn[hidden] { display: none; }
+/* An admin_only dashboard (Bounding Boxes) is hidden outside admin mode; the
+   same inline-flex override as Stop above applies to every dashboard button. */
+.dashboard-btn[hidden] { display: none; }
+/* "i" glyph beside a section heading: a 28 px button with a 16 px ring
+   (workflow design, section 7), scoped like the showcase page's copy. */
+.launcher-page .tip {
+  width: 28px; height: 28px; margin: -6px -4px; padding: 0; background: none; border: 0;
+  display: inline-grid; place-items: center; vertical-align: middle; cursor: help;
+  color: var(--text-dim); flex: none;
+}
+.launcher-page .tip span {
+  width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 50%;
+  font: 700 12px/14px var(--font-mono); text-align: center; display: block;
+}
+.launcher-page .tip:hover span, .launcher-page .tip:focus-visible span {
+  border-color: var(--tmobile-hot); color: var(--tmobile-hot);
+}
+.launcher-status {
+  font-family: var(--font-pixel);
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  color: var(--light-dim);
+  text-transform: uppercase;
+}
+.launcher-status.live { color: var(--tmobile); }
+.launcher-new-form { display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* Label coverage strip (ui.coverage). Plain divs: no chart library. */
+.coverage-strip {
+  background: var(--gray-2);
+  border: 1px solid rgba(255, 179, 217, 0.2);
+  padding: 1rem 1.2rem;
+  margin: 1.2rem 0 0;
+}
+.coverage-head {
+  display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+}
+.coverage-head .section-heading { margin: 0; }
+.coverage-headline {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--light);
+  flex: 1 1 auto;
+}
+.coverage-rows { display: flex; flex-direction: column; gap: 3px; }
+.coverage-row { display: flex; align-items: center; gap: 0.7rem; }
+/* Full name plus code chip. Fixed width so every bar starts on one line. The
+   column is a flex row: the NAME takes what is left and truncates, the code
+   chip never shrinks, so a long binomial in a narrow window loses the tail of
+   its name and never the code. The row tooltip carries the whole name. */
+.coverage-label {
+  flex: 0 0 236px;
+  display: flex; align-items: baseline; gap: 0.3rem; min-width: 0;
+  font-size: 0.8rem;
+  color: var(--light);
+}
+.coverage-label .vic-name {
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.coverage-label .vic-code { flex: 0 0 auto; }
+@container (max-width: 999px) { .coverage-label { flex: 0 0 180px; } }
+/* A resolved name, italic when it is a species binomial. */
+.vic-name { color: var(--light); }
+/* The code beside the name, and a code the registry resolves to nothing. */
+.vic-code {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.5px;
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 179, 217, 0.3);
+  color: var(--bubble);
+  white-space: nowrap;
+}
+.vic-code-bare { color: var(--light-dim); border-style: dashed; }
+.coverage-count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--light-dim);
+  flex: 0 0 46px;
+  text-align: right;
+}
+.coverage-bar {
+  display: flex;
+  flex: 1 1 auto;
+  height: 8px;
+  min-width: 80px;
+  background: rgba(255, 179, 217, 0.12);
+  overflow: hidden;
+}
+.coverage-bar-found { background: var(--ok); display: block; height: 100%; }
+.coverage-bar-absent { background: rgba(255, 179, 217, 0.45); display: block; height: 100%; }
+.coverage-split {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--light-dim);
+  flex: 0 0 74px;
+}
+.coverage-partial {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--tmobile);
+  margin-top: 0.55rem;
+}
+
+/* Create/open prompt: initials (who) to the LEFT of purpose (why). */
+.launcher-prompt-row { display: flex; gap: 0.75rem; align-items: flex-start; }
+.launcher-prompt-ini { flex: 0 0 96px; }
+.launcher-prompt-ini .field-input { text-transform: uppercase; }
+.launcher-prompt-purpose { flex: 1 1 auto; }
+.launcher-prompt-purpose .textarea { width: 100%; resize: vertical; }
+.req-star { color: var(--err, #ff5c7a); }
+
+/* F3: the project list is the launcher's elastic region; cards fill the width in
+   as many columns as fit. */
+.runs-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 0.8rem; align-items: start; }
+/* F8: a long project name wraps inside its card instead of widening the grid track.
+   break-word wraps at a break opportunity first and splits a token only when it
+   cannot fit on a line of its own (anywhere also shrank the min-content width and
+   split names mid-token in every multi-column grid). */
+.runs-list > * { min-width: 0; overflow-wrap: break-word; }
+.run-card {
+  background: var(--gray-2);
+  border: 1px solid rgba(255, 179, 217, 0.22);
+  padding: 1rem 1.2rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+}
+.run-card:hover {
+  border-color: var(--bubble);
+  box-shadow: 0 0 16px rgba(255, 179, 217, 0.2);
+}
+.run-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.3rem 1rem; }
+/* The open button keeps its arrow on its line and never shrinks under a long title. */
+.run-open-btn { white-space: nowrap; flex-shrink: 0; }
+.run-card-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--bubble);
+}
+.run-card-when {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--light-dim);
+}
+/* Project manifest line: counts, species chips, who signed the work. */
+.run-card-stats {
+  display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+  margin: 0.5rem 0 0.1rem;
+}
+.run-card-stat-count {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--light);
+  margin-right: 0.25rem;
+}
+.run-species-chip,
+.launcher-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.5px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 179, 217, 0.3);
+  color: var(--light-dim);
+}
+.run-species-chip b { color: var(--bubble); font-weight: 700; }
+/* Inside a card chip a bare code needs no second box: the chip is the box. */
+.run-species-chip .vic-code-bare { border: none; padding: 0; }
+.run-species-chip-more { border-style: dashed; }
+.run-reviewer-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.5px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 179, 217, 0.3);
+  color: var(--light-dim);
+  margin-left: auto;
+}
+/* Unattributed work is a defect, not a neutral state: the chip says so, and so
+   does the chip of a project with nothing in it. */
+.run-reviewer-chip-missing,
+.run-attention-chip {
+  color: var(--err, #ff5c7a);
+  border-color: var(--err, #ff5c7a);
+  border-style: dashed;
+}
+/* The composite name is a real folder name under _composite/, so it is shown
+   verbatim: no text-transform, which would misreport its case. */
+.run-composite-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 1.2px;
+  padding: 2px 9px;
+  margin-top: 0.5rem;
+  border: 1px solid var(--tmobile);
+  color: var(--tmobile);
+}
+.run-card-steps { display: flex; gap: 4px; margin: 0.6rem 0 0.55rem; }
+.step-dot {
+  width: 16px; height: 6px;
+  background: rgba(255, 179, 217, 0.2);
+  display: inline-block;
+}
+.step-dot.step-completed { background: var(--ok); }
+.step-dot.step-running,
+.step-dot.step-pending { background: var(--tmobile); }
+.step-dot.step-error,
+.step-dot.step-failed { background: var(--err); }
+.step-dot.step-locked { background: rgba(255, 179, 217, 0.12); }
+.run-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.run-card-progress {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--light);
+}
+
+/* Pings lists reuse the run-card layout above for a consistent look. */
+.pings-cols { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+@container (min-width: 1000px) { .pings-cols { grid-template-columns: 1fr 1fr; } }
+.ping-tags-row { margin: 0.5rem 0 0.4rem; }
+.blog-embed .tagchip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 179, 217, 0.3);
+  color: var(--light-dim);
+  margin: 0 4px 4px 0;
+}
+.draft-badge {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--tmobile);
+  border: 1px solid var(--tmobile);
+  border-radius: 99px;
+  padding: 0 6px;
+  vertical-align: middle;
+}
+.run-card-archive { display: flex; justify-content: center; margin-top: 0.5rem; }
+.run-archive-btn {
+  background: none; border: none; color: var(--light-dim);
+  cursor: pointer; padding: 4px; line-height: 0;
+}
+.run-archive-btn:hover { color: var(--err, #ff5c7a); }
+.run-card-desc {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--light);
+  margin: 0.35rem 0 0;
+  cursor: text;
+}
+.run-card-desc.empty { color: var(--light-dim); font-style: italic; }

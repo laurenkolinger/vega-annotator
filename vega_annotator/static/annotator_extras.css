@@ -1,0 +1,10 @@
+/* A fixed width so a count going from 100 to 99 never moves the image. */
+#va-frames-left {
+  display: inline-block;
+  width: 72px;
+  margin-left: 8px;
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}

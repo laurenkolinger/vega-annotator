@@ -1,0 +1,130 @@
+<!doctype html>
+{#- The project window. It copies VEGA's main window: the same stylesheets, top bar, rail,
+    and Place + Segment panel. Steps VEGA runs on the mainframe stay on the rail with their
+    real status from project.json. -#}
+{%- macro q(text, about) -%}
+<button type="button" class="tip" aria-label="About {{ about }}" title="{{ text }}"><span aria-hidden="true">?</span></button>
+{%- endmacro -%}
+{%- macro sec(text, about) -%}
+<button type="button" class="tip" aria-label="About {{ about }}" title="{{ text }}"><span aria-hidden="true">i</span></button>
+{%- endmacro -%}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ run[4:] }} | VEGA Annotator</title>
+  <link rel="stylesheet" href="/static/fonts.css">
+  <link rel="stylesheet" href="/static/vicarius_workflow.css">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/project.css">
+</head>
+<body data-run="{{ run }}" data-project-loaded="true">
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:10px">
+    <h1>VEGA</h1>
+    {{ sec("VEGA Annotator runs VEGA's annotator on this computer. Steps 1 to 3 and 5 to 7 stay on the mainframe, and this project's records keep their status here.", "this window") }}
+    <span class="topbar-chain" title="A project reads the survey point counts (CVR), pulls the matching video still frames (CLIP), segments each organism with SAM3, then trains and runs a YOLO11 segmentation model.">CVR -&gt; CLIP -&gt; SAM3 -&gt; YOLO11</span>
+    <span class="project-name" id="topbar-project-name" title="VEGA names a project from its initials, target labels, image count, and date created."></span>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-outline btn-sm" id="open-project-folder" title="Show this project's Place + Segment folder in the file manager.">Open Project Folder</button>
+  </div>
+</div>
+
+<div id="app-screen" class="app-container" style="display:flex">
+  <div class="sidebar visible">
+    <ul class="step-nav" id="step-nav">
+      <li data-step="1"><div class="step-circle">1</div><div class="step-info"><div class="step-title">Fetch Points</div><div class="step-status" id="status-1">locked</div></div></li>
+      <li data-step="2"><div class="step-circle">2</div><div class="step-info"><div class="step-title">Fetch Labels</div><div class="step-status" id="status-2">locked</div></div></li>
+      <li data-step="3"><div class="step-circle">3</div><div class="step-info"><div class="step-title">Choose Images</div><div class="step-status" id="status-3">locked</div></div></li>
+      <li data-step="step4test" class="active"><div class="step-circle">4</div><div class="step-info"><div class="step-title">Place + Segment</div><div class="step-status" id="status-step4test">combined annotator</div></div></li>
+      <li data-step="6"><div class="step-circle">5</div><div class="step-info"><div class="step-title">Train Model</div><div class="step-status" id="status-6">locked</div></div></li>
+      <li data-step="7"><div class="step-circle">6</div><div class="step-info"><div class="step-title">Evaluate Model</div><div class="step-status" id="status-7">locked</div></div></li>
+      <li data-step="8"><div class="step-circle">7</div><div class="step-info"><div class="step-title">Model Inference</div><div class="step-status" id="status-8">locked</div></div></li>
+      <li class="nav-section" aria-hidden="true" style="pointer-events:none;padding-top:14px;margin-top:8px;border-top:1px solid rgba(255,255,255,0.08)"><div class="step-info"><div class="step-title">Server folder</div></div></li>
+      <li data-step="putback"><div class="step-circle">&#8679;</div><div class="step-info"><div class="step-title">Put Back</div><div class="step-status" id="status-putback">checking</div></div></li>
+    </ul>
+  </div>
+
+  <div class="main-panel">
+    <div class="step-panel" id="panel-mainframe">
+      <div class="card">
+        <div class="panel-head"><h2 id="mainframe-title"></h2></div>
+        <p class="va-mainframe-note" id="mainframe-note"></p>
+      </div>
+    </div>
+
+    <div class="step-panel active" id="panel-step4test">
+      <div class="card">
+        <div class="panel-head">
+          <h2>Step <span class="stage-num">4</span>: Place + Segment</h2>
+          {{ sec("Step 4 folds point placement and segmentation into one pass: click an organism and SAM3 makes its mask on the spot.", "Place + Segment") }}
+        </div>
+        <div class="batch-readout" id="frames-readout" title="VEGA Annotator counts the project's frames: not yet exported, exported, and scrapped."></div>
+        <div class="checkbox-group">
+          {%- set t = "Limit the annotation session and its export to frames carrying a label from Step 3's target list, on by default. Untick it to take every routed frame." -%}
+          <div class="field-head"><span class="field-label">Frames to annotate</span>{{ q(t, "the target-label limit") }}</div>
+          <label class="opt" for="s4test-target-only"><input type="checkbox" id="s4test-target-only" checked title="{{ t }}"> Target labels only</label>
+        </div>
+        <div class="checkbox-group">
+          {%- set t = "Draw the routed survey points on the canvas as a large muted guide that cannot be edited, on by default." -%}
+          <div class="field-head"><span class="field-label">Survey points</span>{{ q(t, "the read-only guide") }}</div>
+          <label class="opt" for="s4test-reference"><input type="checkbox" id="s4test-reference" checked title="{{ t }}"> Show existing points as a read-only guide</label>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            {%- set t = "Choose how many frames the annotator loads before it offers to export, 10 by default. VEGA Annotator applies a change here at the next Open." -%}
+            <div class="field-head"><label for="s4test-batch-size">Review batch size</label>{{ q(t, "the review batch size") }}</div>
+            <select id="s4test-batch-size" title="{{ t }}">
+              <option value="5">5 frames</option>
+              <option value="10" selected>10 frames (default)</option>
+              <option value="20">20 frames</option>
+              <option value="all">All (no batching)</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-group panel-actions">
+          <button class="btn btn-magenta" id="s4test-run-btn" title="Open the annotator in its own window once SAM3 has loaded.">Open Annotator</button>
+          <button class="btn btn-outline btn-sm" id="s4test-folder-btn" title="Show the Place + Segment folder, where the frames and the training export sit, in the file manager.">Open Folder</button>
+        </div>
+        <div id="s4test-service" style="display:none;margin-top:16px">
+          <div class="service-status-row">
+            <span class="health-dot" id="s4test-health"></span>
+            <span id="s4test-health-text">Starting...</span>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-danger btn-sm" id="s4test-stop-btn" title="Save the annotator's work, stop the service, and free this computer's memory.">Stop Service</button>
+          </div>
+        </div>
+        <div class="log-output" id="s4test-log" style="display:none"></div>
+        <div id="s4test-state" class="va-result warn" style="display:none"></div>
+        <div id="s4test-note" class="va-result"></div>
+      </div>
+    </div>
+
+    <div class="step-panel" id="panel-putback">
+      <div class="card">
+        <div class="panel-head">
+          <h2>Put Back</h2>
+          {{ sec("Put Back sends this project's work to the server folder, in VEGA's own formats. VEGA Annotator saves and closes the annotator first, checks every file it sends, and keeps a copy of each file it replaces.", "Put Back") }}
+        </div>
+        <div class="batch-readout" id="putback-readout"></div>
+        <div class="btn-group panel-actions">
+          <button class="btn btn-magenta" id="putback-btn" title="Send this computer's work to the server folder.">Put Back</button>
+        </div>
+        <div id="putback-progress" class="va-progress" style="display:none"><div class="va-progress-bar"></div></div>
+        <div id="putback-result" class="va-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-foot">
+  <span>VEGA Annotator, the laptop copy of VEGA's annotator</span>
+  <span>Built by Lauren Olinger</span>
+</div>
+<script src="/static/vicarius_tooltips.js"></script>
+<script src="/static/common_ui.js"></script>
+<script src="/static/project.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+/* Only what the VICARIUS launcher's stylesheets do not already hold. */
+.va-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; min-height: 44px; }
+.va-path {
+  flex: 1 1 280px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--light);
+}
+.launcher-chip {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 179, 217, 0.3);
+  color: var(--light-dim);
+  white-space: nowrap;
+}
+.launcher-chip.good { color: var(--ok); border-color: var(--ok); }
+.launcher-chip.warn { color: #FFB800; border-color: #FFB800; }
+.launcher-chip.bad { color: var(--err); border-color: var(--err); }
+.va-note { font-family: var(--font-body); font-size: 13px; color: var(--light-dim); margin-top: 6px; min-height: 20px; }
+.va-note.bad { color: var(--err); }
+.va-note.good { color: var(--ok); }
+.va-progress { height: 6px; margin-top: 10px; background: rgba(255, 179, 217, 0.12); overflow: hidden; }
+.va-progress-bar { height: 100%; width: 0; background: var(--tmobile); transition: width 0.3s; }
+.run-card-state { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; min-height: 26px; }
+.run-card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
+.run-card-frames { font-family: var(--font-mono); font-size: 0.82rem; color: var(--light); }
+.run-card-error { font-family: var(--font-body); font-size: 13px; color: var(--err); margin-top: 0.4rem; }
+.launcher-page .btn-accent[hidden], .launcher-page .btn-accent-outline[hidden] { display: none; }
+.va-targets { font-family: var(--font-body); font-size: 13px; color: var(--light-dim); margin-top: 0.4rem; }
+.run-card-state .va-stop { margin-left: auto; }
+.modal-body .va-note { margin: 0 0 12px; }
+.run-card-foot { min-height: 44px; }
+/* VICARIUS's cards all open. Here a card opens only when this computer holds its project. */
+.run-card:not(.va-openable) { cursor: default; }
+.run-card:not(.va-openable):hover { border-color: rgba(255, 179, 217, 0.22); box-shadow: none; }
+.run-card:not(.va-openable) .run-card-desc { cursor: default; }

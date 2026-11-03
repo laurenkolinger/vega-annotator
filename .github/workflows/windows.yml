@@ -1,0 +1,36 @@
+# Run the real Windows installer and the test suite on a Windows machine. No GPU and no SAM3
+# weights here, so tests that need them skip; the Legion's Test SAM3 button covers those.
+name: Windows
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  install-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build the installer zip
+        run: |
+          python -m pip install pillow
+          python packaging/windows/build_zip.py
+          Expand-Archive -Path dist/VEGAAnnotator-*-Windows.zip -DestinationPath installer
+      - name: Run the real installer
+        run: cmd /c "installer\VEGA Annotator Installer\Install VEGA Annotator.cmd"
+      - name: The home screen answers
+        run: |
+          Start-Sleep -Seconds 20
+          $health = Invoke-RestMethod -Uri 'http://127.0.0.1:5050/api/health' -TimeoutSec 20
+          if (-not $health.ok) { throw 'The home screen did not answer.' }
+          Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:5050/api/shutdown' -ContentType 'application/json' -Body '{}'
+      - name: Run the tests on the installed runtime
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          $python = "$env:LOCALAPPDATA\VEGA Annotator\runtime\Scripts\python.exe"
+          & "$env:LOCALAPPDATA\VEGA Annotator\runtime\Scripts\python.exe" -m ensurepip
+          & $python -m pip install pytest
+          & $python -m pytest tests -q

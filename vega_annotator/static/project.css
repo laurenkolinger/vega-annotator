@@ -1,0 +1,10 @@
+/* Only what VEGA's main window stylesheets do not already hold. */
+.va-mainframe-note { color: var(--text-dim); font-size: 14px; margin: 8px 0 0; }
+.va-progress { height: 6px; margin-top: 12px; border-radius: var(--radius); background: var(--border); overflow: hidden; }
+.va-progress-bar { height: 100%; width: 0; background: var(--magenta); transition: width 0.3s; }
+.va-result { min-height: 22px; margin-top: 10px; font-size: 13px; color: var(--text-dim); }
+.va-result.good { color: var(--success); }
+.va-result.bad { color: var(--error); }
+.va-result.warn { color: var(--warning); }
+#frames-readout, #putback-readout { margin: 0 0 14px; }
+.step-nav li { cursor: pointer; }
