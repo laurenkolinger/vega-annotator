@@ -25,9 +25,9 @@ Rules that keep work safe:
 """
 
 import csv
-import glob
 import hashlib
 import os
+import re
 import shutil
 import tempfile
 import threading
@@ -698,8 +698,11 @@ def bring_in(server_folder, run, initials, computer, take_over=False, progress=N
     if final.exists():
         finish_interrupted(final, source)
     # A journal that needed a staging folder is finished by now, so any still here is left over.
-    for leftover in glob.glob(str(local_root / f".incoming_{glob.escape(run)}_*")):
-        shutil.rmtree(leftover, ignore_errors=True)
+    # The exact staging name only: a same-day repeat such as run_x_2 has staging folders too.
+    leftover_name = re.compile(r"^\.incoming_%s_[0-9a-f]{8}$" % re.escape(run))
+    for leftover in local_root.iterdir() if local_root.is_dir() else ():
+        if leftover_name.match(leftover.name):
+            shutil.rmtree(leftover, ignore_errors=True)
     state = read_server_state(source)
     listing = read_checksums(source)
     if PROJECT_JSON_REL not in listing:

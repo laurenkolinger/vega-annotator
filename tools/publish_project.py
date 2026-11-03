@@ -27,6 +27,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -307,9 +308,10 @@ def clear_leftovers(dest, run):
     Returns:
         None.
     """
-    prefix = ".publishing_%s_" % run
+    # The exact staging name only: a same-day repeat such as run_x_2 has staging folders too.
+    pattern = re.compile(r"^\.publishing_%s_[0-9a-f]{8}$" % re.escape(run))
     for name in os.listdir(dest):
-        if name.startswith(prefix):
+        if pattern.match(name):
             shutil.rmtree(os.path.join(dest, name), ignore_errors=True)
 
 

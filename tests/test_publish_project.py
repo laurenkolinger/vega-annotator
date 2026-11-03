@@ -206,3 +206,11 @@ def test_a_stopped_copy_leaves_nothing_behind_for_the_next_one(tmp_path, source_
     (dest / ".publishing_run_other_keep5678").mkdir()
     tool.publish(str(source_project), str(dest), "LO", **PUBLISH)
     assert sorted(p.name for p in dest.iterdir() if p.name.startswith(".publishing")) == [".publishing_run_other_keep5678"]
+
+
+def test_a_same_day_repeat_keeps_its_staging_folder(tmp_path, source_project):
+    dest = tmp_path / "dest"
+    other = dest / f".publishing_{source_project.name}_2_ab12cd34"
+    other.mkdir(parents=True)
+    tool.publish(str(source_project), str(dest), "LO", **PUBLISH)
+    assert other.is_dir()

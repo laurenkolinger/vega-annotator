@@ -1138,3 +1138,13 @@ def test_a_project_size_ignores_image_links_and_records(published):
     assert any(images.iterdir())
     (project / "vega_annotator_extra.txt").write_bytes(b"12345")
     assert transfer.project_size(project) == before + 5
+
+
+def test_a_same_day_repeat_keeps_its_staging_folder(published, tmp_path, monkeypatch):
+    folder, run = published
+    root = paths.projects_dir()
+    root.mkdir(parents=True, exist_ok=True)
+    other = root / f".incoming_{run}_2_ab12cd34"
+    other.mkdir()
+    bring(published)
+    assert other.is_dir()
