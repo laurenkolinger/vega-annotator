@@ -193,3 +193,49 @@ def test_a_broken_file_list_gives_no_size_and_no_crash(published):
     folder, run = published
     (folder / "projects" / run / transfer.CHECKSUMS).write_text("{broken", encoding="utf-8")
     assert cards(folder)[0]["size_bytes"] is None
+
+
+def test_catalog_shows_made_here_card_with_its_buttons(server_folder, published, tmp_path):
+    from vega_annotator import folder_projects
+    folder = tmp_path / "photos"
+    helpers.write_image(folder / "a.jpg")
+    helpers.write_image(folder / "sub" / "b.png")
+    run = folder_projects.create(folder, "Reef health", "healthy, bleached", "LO", "health labels")["run"]
+    for listing in (cards(server_folder), cards("", connected=False), cards(tmp_path / "gone", connected=True)):
+        card = {item["run"]: item for item in listing}[run]
+        assert card["state"] == "made_here" and card["where"] == "local" and card["error"] == ""
+        assert card["actions"] == ["open", "add_images", "labels", "export_for_vega", "remove"]
+        assert card["holder"] is None and card["holding"] is False and card["pending_files"] == 0
+        assert card["frames_total"] == 2 and card["frames_left"] == 2 and card["size_bytes"] > 0
+        assert [label["code"] for label in card["target_labels"]] == ["healthy", "bleached"]
+    server_card = {item["run"]: item for item in cards(server_folder)}[published[1]]
+    assert server_card["state"] == "on_server" and "actions" not in server_card
+
+
+def test_a_project_whose_import_stopped_partway_offers_only_add_images_and_remove(tmp_path):
+    """A project marked creating lists only ADD IMAGES and REMOVE, and the folder it came from."""
+    from vega_annotator import folder_projects
+    folder = tmp_path / "photos"
+    helpers.write_image(folder / "a.jpg")
+    run = folder_projects.create(folder, "Reef health", "healthy", "LO", "health labels")["run"]
+    project = paths.projects_dir() / run
+    record = json.loads((project / transfer.LOCAL_STATE).read_text(encoding="utf-8"))
+    (project / transfer.LOCAL_STATE).write_text(json.dumps({**record, "creating": True}), encoding="utf-8")
+    card = {item["run"]: item for item in cards("", connected=False)}[run]
+    assert card["state"] == "made_here" and card["creating"] is True
+    assert card["actions"] == ["add_images", "remove"]
+    assert card["origin_folder"] == str(folder.resolve())
+    (project / transfer.LOCAL_STATE).write_text(json.dumps(record), encoding="utf-8")
+    card = {item["run"]: item for item in cards("", connected=False)}[run]
+    assert card["creating"] is False and card["actions"] == ["open", "add_images", "labels", "export_for_vega", "remove"]
+
+
+def test_a_made_here_card_ignores_a_server_project_of_the_same_name(server_folder, tmp_path):
+    from vega_annotator import folder_projects
+    folder = tmp_path / "photos"
+    helpers.write_image(folder / "a.jpg")
+    run = folder_projects.create(folder, "Reef health", "healthy", "LO", "x")["run"]
+    helpers.publish_to(server_folder, helpers.make_project(tmp_path / "inprocess", run=run))
+    card = cards(server_folder)[0]
+    assert card["run"] == run and card["state"] == "made_here" and card["where"] == "local"
+    assert card["holder"] is None and card["server_rev"] is None

@@ -5,28 +5,27 @@ mainframe, so you can label when the mainframe is busy. Your work goes back to t
 folder when you are done.
 
 
-INSTALL (once per computer, about 15 minutes)
+INSTALL (once per computer, 20 minutes to an hour, depending on the connection)
 
-The same installers are at https://github.com/laurenkolinger/vega-annotator/releases/latest
+The same installer is at https://github.com/laurenkolinger/vega-annotator/releases/latest
 
-1. Connect the server to your computer, and open your folder on it.
+1. Open the install folder here.
+   Mac with an Apple chip: double-click VEGAAnnotator-1.1.0.pkg. If macOS blocks it, open
+   System Settings, Privacy & Security, click Open Anyway, and run it again. Accept Meta's
+   SAM License when the installer shows it.
+   Windows: version 1.1 is for Macs. On Windows, use VEGAAnnotator-1.0.0-Windows.zip: copy
+   it to your computer, unzip it, and double-click "Install VEGA Annotator.cmd". If Windows
+   warns you, click More info, then Run anyway. After step 3, click INSTALL SAM3.
 
-2. Open the install folder here.
-   Mac with an Apple chip: double-click VEGAAnnotator-1.0.0.pkg. If macOS blocks it, open
-   System Settings, Privacy & Security, click Open Anyway, and run it again.
-   Windows: copy VEGAAnnotator-1.0.0-Windows.zip to your computer, unzip it, and
-   double-click "Install VEGA Annotator.cmd". If Windows warns you, click More info, then
-   Run anyway.
+2. Let it download Python, PyTorch and SAM3 when it asks, about 4.5 GB on a Mac.
 
-3. Let it download Python and PyTorch when it asks. This takes about 1 GB on a Mac and about
-   4 GB on a Windows computer with an NVIDIA card.
-
-4. The home screen opens in your browser. Click CHOOSE FOLDER and pick this VEGA_Annotator
+3. The home screen opens in your browser. Click CHOOSE FOLDER and pick this VEGA_Annotator
    folder on the server.
 
-5. Click INSTALL SAM3. This copies 3.4 GB from this folder.
+4. Click TEST SAM3. It tells you how long a frame takes on this computer.
 
-6. Click TEST SAM3. It tells you how long a frame takes on this computer.
+If the SAM3 download stops, click DOWNLOAD SAM3 to try again; it picks up where it stopped.
+Or click INSTALL FROM SERVER FOLDER, which copies SAM3 from this folder, 3.4 GB.
 
 
 LABEL

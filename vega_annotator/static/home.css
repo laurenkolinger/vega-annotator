@@ -22,6 +22,7 @@
 .va-note { font-family: var(--font-body); font-size: 13px; color: var(--light-dim); margin-top: 6px; min-height: 20px; }
 .va-note.bad { color: var(--err); }
 .va-note.good { color: var(--ok); }
+.va-note.warn { color: #FFB800; }
 .va-progress { height: 6px; margin-top: 10px; background: rgba(255, 179, 217, 0.12); overflow: hidden; }
 .va-progress-bar { height: 100%; width: 0; background: var(--tmobile); transition: width 0.3s; }
 .run-card-state { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; min-height: 26px; }
@@ -37,3 +38,83 @@
 .run-card:not(.va-openable) { cursor: default; }
 .run-card:not(.va-openable):hover { border-color: rgba(255, 179, 217, 0.22); box-shadow: none; }
 .run-card:not(.va-openable) .run-card-desc { cursor: default; }
+
+/* The New project panel sits beside the server folder, in the launcher's own two-column
+   hero, which VICARIUS keeps for its New Project panel. Below 860 px it stacks. */
+@media (max-width: 860px) { .va-hero-pair { grid-template-columns: 1fr; } }
+/* Buttons that belong together wrap together, to the right. */
+.va-buttons { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-left: auto; }
+.va-buttons:not(:has(button:not([hidden]))) { display: none; }
+.va-lede { flex: 1 1 200px; min-width: 0; font-family: var(--font-body); font-size: 14px; color: var(--light); }
+.launcher-page .va-locked[hidden], .modal .btn-accent[hidden], .modal .btn-accent-outline[hidden] { display: none; }
+
+/* Keyboard focus in VICARIUS's own magenta, the way its small buttons show it. */
+.launcher-page button:focus-visible, .modal button:focus-visible, .modal summary:focus-visible,
+.va-check input:focus-visible { outline: 2px solid var(--tmobile-hot); outline-offset: 2px; }
+
+/* A control a person cannot use right now: dimmed, no glow, and a cursor that says so.
+   Its tooltip says why (aria-disabled keeps the tooltip; disabled would hide it). */
+.va-locked, .va-locked:hover { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+.btn-accent.va-locked:hover { background: var(--tmobile); border-color: var(--tmobile); color: var(--darker); }
+.btn-accent-outline.va-locked:hover, .btn-ghost.va-locked:hover { background: transparent; color: var(--bubble); }
+.btn-sm.va-locked:hover { color: var(--light-dim); border-color: var(--border); }
+
+/* A label a person typed is a plain word: never italic, never a code chip. */
+.va-label-word { font-style: normal; color: var(--light); }
+.run-species-chip .va-label-word { color: var(--light-dim); }
+
+/* A project made here has four actions, so they take their own row under the count. */
+.run-card-foot.va-foot-wide { flex-wrap: wrap; row-gap: 0.6rem; }
+.run-card-foot.va-foot-wide .run-card-actions { margin-left: auto; }
+
+/* Dialog rows: a path beside its CHOOSE FOLDER, a one-line hint, and what a folder holds. */
+.modal .field-label:first-of-type { margin-top: 0.4rem; }
+.va-field-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; min-height: 44px; }
+.va-field-row .va-path { flex: 1 1 220px; }
+.va-path-empty { color: var(--light-dim); font-family: var(--font-body); }
+.va-hint { font-family: var(--font-body); font-size: 13px; color: var(--light-dim); margin-top: 6px; }
+.va-summary { font-family: var(--font-body); font-size: 13px; line-height: 1.5; color: var(--light-dim); margin-top: 10px; min-height: 20px; }
+.va-summary.good { color: var(--ok); }
+.va-summary.bad { color: var(--err); }
+.va-skipped { margin-top: 6px; color: var(--light-dim); }
+.va-skipped summary { cursor: crosshair; color: var(--light); width: max-content; }
+.va-skipped ul { margin: 6px 0 0; padding-left: 1.1rem; max-height: 140px; overflow: auto; }
+.va-skipped li { margin: 2px 0; }
+.va-skipped-path { font-family: var(--font-mono); color: var(--light); overflow-wrap: anywhere; }
+.va-labels-box { min-height: 72px; }
+.modal .launcher-prompt-purpose .textarea { min-height: 64px; }
+.va-selectable { user-select: text; overflow-wrap: anywhere; }
+.modal label.va-check {
+  display: flex; align-items: center; gap: 0.55rem; margin: 14px 0 0; min-height: 28px;
+  font-family: var(--font-body); font-size: 14px; letter-spacing: 0; text-transform: none;
+  color: var(--light); cursor: crosshair; width: max-content;
+}
+.va-check input { accent-color: var(--tmobile); width: 16px; height: 16px; margin: 0; cursor: crosshair; }
+.va-check-size { font-family: var(--font-mono); font-size: 13px; color: var(--light-dim); }
+
+/* The labels list, in key order: the key, the label, how many masks carry it, its actions. */
+.va-labels-note { font-family: var(--font-body); font-size: 13px; line-height: 1.5; color: var(--light-dim); margin: 0 0 12px; }
+.va-labels-note-warn { color: #FFB800; }
+.va-label-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid rgba(255, 179, 217, 0.15); }
+.va-label-row {
+  display: flex; align-items: center; gap: 0.75rem; min-height: 46px; padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 179, 217, 0.15);
+}
+.va-label-key {
+  flex: 0 0 26px; height: 26px; display: grid; place-items: center;
+  font: 700 13px/1 var(--font-mono); color: var(--bubble); border: 1px solid rgba(255, 179, 217, 0.35);
+}
+.va-label-key-none { color: var(--light-dim); border-style: dashed; }
+.va-label-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-family: var(--font-body); font-size: 15px; color: var(--light); }
+.va-label-rename-input.field-input { flex: 1 1 auto; min-width: 0; padding: 0.35rem 0.6rem; }
+.va-label-use { font-family: var(--font-mono); font-size: 12px; color: var(--light-dim); white-space: nowrap; }
+.va-label-actions { display: flex; gap: 0.4rem; }
+.btn-sm.va-mini { font-size: 12px; padding: 0.4rem 0.65rem; letter-spacing: 0.08em; }
+/* A RENAME or REMOVE that can be used takes the pink outline of the dialog's other buttons, at
+   the small size, so it never looks like a locked one. */
+.btn-accent-outline.va-mini { font-size: 12px; padding: 0.4rem 0.65rem; letter-spacing: 0.08em; border-width: 1px; }
+.va-label-add { margin-top: 16px; }
+.modal .va-label-add-label { margin: 0 0 0.4rem; }
+.va-label-add-row { display: flex; align-items: center; gap: 0.75rem; }
+.va-label-add-row .field-input { flex: 1 1 auto; min-width: 0; }
+.va-labels-error { font-family: var(--font-body); font-size: 13px; color: var(--err); min-height: 20px; margin-top: 8px; }

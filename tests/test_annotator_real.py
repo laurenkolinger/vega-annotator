@@ -117,3 +117,77 @@ def test_self_test_passes_on_this_computer(tmp_path):
     report = json.loads(result.stdout.strip().splitlines()[-1])
     assert report["ok"] is True, report
     assert report["iou"] >= 0.7 and report["encode_s"] < 60 and report["dtype"] == "float32"
+
+
+def disk_photo(path, center, form):
+    """Write a 640 by 360 photo holding one bright disk, in the format form names, and return the disk's area."""
+    import numpy as np
+    from PIL import Image
+
+    width, height = helpers.FRAME_SIZE
+    rng = np.random.default_rng(len(path.name))
+    frame = rng.integers(20, 70, size=(height, width, 3), dtype=np.uint8)
+    ys, xs = np.ogrid[:height, :width]
+    disk = (xs - center[0]) ** 2 + (ys - center[1]) ** 2 <= 70 ** 2
+    frame[disk] = (235, 200, 120)
+    Image.fromarray(frame).save(path, form)
+    return int(disk.sum())
+
+
+def test_real_new_project_with_custom_labels_exports_for_vega(tmp_path, monkeypatch):
+    """NEW PROJECT from a folder of JPEG and PNG photos with two typed labels, one real SAM3 click
+    per label through VEGA's annotator routes, a batch export, then EXPORT FOR VEGA."""
+    import hashlib
+    import time
+
+    import yaml
+
+    from vega_annotator import home, package
+
+    photos = tmp_path / "Student photos"
+    photos.mkdir()
+    areas = {"custom_IMG_1.jpg": disk_photo(photos / "IMG_1.jpg", (320, 180), "JPEG"),
+             "custom_IMG_2.jpg": disk_photo(photos / "IMG_2.png", (300, 170), "PNG")}
+    typed = ["healthy", "Partly bleached"]
+    monkeypatch.setattr(home, "jobs", home.JobBoard())
+    client = home.app.test_client()
+    answer = client.post("/api/projects/new", base_url="http://127.0.0.1:5050", content_type="application/json",
+                         data=json.dumps({"folder": str(photos), "name": "Real SAM3 check", "labels": ", ".join(typed),
+                                          "initials": "jm", "purpose": "the real SAM3 check"})).get_json()
+    for _attempt in range(600):
+        job = client.get(f"/api/jobs/{answer['job']}", base_url="http://127.0.0.1:5050").get_json()["job"]
+        if job["status"] != "running":
+            break
+        time.sleep(0.1)
+    assert job["status"] == "done" and job["result"]["added"] == 2 and job["result"]["skipped_count"] == 0, job
+    project = paths.projects_dir() / answer["run"]
+    annotator = Annotator(project, BOOT, plan=CPU_PLAN, hf_home=HF_HOME, cache_dir=str(tmp_path / "cache"))
+    try:
+        annotator.boot()
+        frames = sorted(annotator.batch_frames())
+        assert frames == ["custom_IMG_1.jpg", "custom_IMG_2.jpg"]
+        chosen = dict(zip(frames, typed))
+        for name, label in chosen.items():
+            mask = annotator.label_frame(name, x=310, y=175, species=label, category="Label")
+            assert mask["species"] == label, annotator.log_tail()
+            assert abs(mask["area"] - areas[name]) / areas[name] < 0.35, (name, mask["area"], areas[name])
+        stats = annotator.export_batch()
+        assert stats["exported_masks"] == 2, stats
+    finally:
+        annotator.stop()
+    usb = tmp_path / "USB stick"
+    usb.mkdir()
+    written = package.export_for_vega(project, usb)
+    folder = Path(written["folder"])
+    assert written["frames"] == 2 and written["masks"] == 2
+    data = yaml.safe_load((folder / "data.yaml").read_text(encoding="utf-8"))
+    assert data["names"] == {0: "healthy", 1: "Partly bleached"} and data["nc"] == 2
+    for name, label in chosen.items():
+        lines = [line for line in (folder / "all_labels" / f"{Path(name).stem}.txt").read_text(encoding="utf-8").splitlines() if line.strip()]
+        assert lines and {line.split()[0] for line in lines} == {str(typed.index(label))}, (name, lines)
+        assert (folder / "all_images" / name).is_file() and not (folder / "all_images" / name).is_symlink()
+    sums = json.loads((folder / "checksums.json").read_text(encoding="utf-8"))
+    assert set(sums) == {path.relative_to(folder).as_posix() for path in folder.rglob("*") if path.is_file()} - {"checksums.json"}
+    for rel, entry in sums.items():
+        content = (folder / rel).read_bytes()
+        assert len(content) == entry["size"] and hashlib.sha256(content).hexdigest() == entry["sha256"], rel

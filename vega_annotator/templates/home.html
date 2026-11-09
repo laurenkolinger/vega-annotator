@@ -1,6 +1,7 @@
 <!doctype html>
 {#- The home screen. It copies the VICARIUS launcher page for VEGA: the same stylesheets,
-    the same project cards, and the same initials and purpose prompt. -#}
+    the same project cards, and the same initials and purpose prompt. The New project
+    panel sits beside the server folder in the launcher's own two-column hero. -#}
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -17,13 +18,13 @@
   <header class="module-runner-header">
     <div>
       <div class="title-row"><h1 class="page-heading">VEGA Annotator</h1></div>
-      <p class="module-runner-desc">VEGA's annotator on this computer. Projects come from the server folder and go back to it.</p>
+      <p class="module-runner-desc">VEGA's annotator on this computer, for projects from the server folder and for new projects from any folder of images.</p>
     </div>
   </header>
 
-  <section class="launcher-hero launcher-hero-solo">
+  <section class="launcher-hero va-hero-pair">
     <div class="launcher-hero-panel">
-      {% set tip = "VEGA Annotator reads projects and SAM3 from this folder. Connect the server to this computer first, then pick the VEGA_Annotator folder inside your folder on it." %}
+      {% set tip = "VEGA Annotator reads VEGA's projects and SAM3 from this folder. Connect the server to this computer first, then pick the VEGA_Annotator folder inside your folder on it." %}
       <div class="section-heading" title="{{ tip }}"><span>Server folder</span> <button type="button" class="tip" aria-label="About the server folder" title="{{ tip }}"><span>i</span></button></div>
       <div class="va-row">
         <span id="server-chip" class="launcher-chip">Checking</span>
@@ -31,6 +32,16 @@
         <button id="choose-folder" type="button" class="btn-accent-outline" title="Pick the VEGA_Annotator folder inside your folder on the server.">CHOOSE FOLDER</button>
       </div>
       <div id="server-reason" class="va-note"></div>
+    </div>
+    <div class="launcher-hero-panel">
+      {% set tip = "NEW PROJECT makes a project on this computer from any folder of images, with the labels you type. VEGA Annotator copies the images in and leaves your folder as it is." %}
+      <div class="section-heading" title="{{ tip }}"><span>New project</span> <button type="button" class="tip" aria-label="About new projects" title="{{ tip }}"><span>i</span></button></div>
+      <div class="va-row">
+        <span class="va-lede">Your images, your labels. No server needed.</span>
+        <button id="new-project" type="button" class="btn-accent" title="Pick a folder of images, name the project and type its labels. VEGA Annotator copies the images in and makes the project on this computer.">NEW PROJECT</button>
+      </div>
+      <div id="new-project-status" class="va-note" aria-live="polite"></div>
+      <div id="new-project-progress" class="va-progress" hidden><div class="va-progress-bar"></div></div>
     </div>
   </section>
 
@@ -41,17 +52,20 @@
       <div class="va-row">
         <span id="sam3-chip" class="launcher-chip">Checking</span>
         <span id="plan-label" class="va-path"></span>
-        <button id="install-sam3" type="button" class="btn-accent" hidden title="Copy the SAM3 weights, 3.4 GB, from the server folder to this computer.">INSTALL SAM3 &rarr;</button>
-        <button id="test-sam3" type="button" class="btn-accent-outline" hidden title="Run SAM3 once on a test picture and show how long a frame and a click take on this computer.">TEST SAM3</button>
+        <span class="va-buttons">
+          <button id="download-sam3" type="button" class="btn-accent" hidden title="VEGA Annotator downloads SAM3, 3.4 GB, from the lab's GitHub release, and picks up a stopped download where it left off.">DOWNLOAD SAM3</button>
+          <button id="install-sam3" type="button" class="btn-accent-outline" hidden title="VEGA Annotator copies SAM3, 3.4 GB, from the server folder to this computer.">INSTALL FROM SERVER FOLDER</button>
+          <button id="test-sam3" type="button" class="btn-accent-outline" hidden title="Run SAM3 once on a test picture and show how long a frame and a click take on this computer.">TEST SAM3</button>
+        </span>
       </div>
-      <div id="disk-note" class="va-note" title="VEGA Annotator reads this from the disk that holds its projects. Bring In refuses a project that would not fit, with room for labeling to grow."></div>
+      <div id="disk-note" class="va-note" title="VEGA Annotator reads this from the disk that holds its projects. Bring In, NEW PROJECT and ADD IMAGES refuse what would not fit, with room for labeling to grow."></div>
       <div id="sam3-progress" class="va-progress" hidden><div class="va-progress-bar"></div></div>
-      <div id="sam3-result" class="va-note"></div>
+      <div id="sam3-result" class="va-note" aria-live="polite"></div>
     </div>
   </section>
 
   <section class="section">
-    {% set tip = "VEGA Annotator lists every project on this computer and in the server folder, newest first. VEGA makes projects on the mainframe, and a project here keeps VEGA's folder, records and access log." %}
+    {% set tip = "VEGA Annotator lists every project on this computer and in the server folder, newest first. A project from the server keeps VEGA's folder, records and access log; a project made here keeps its labels and images on this computer until EXPORT FOR VEGA hands them over." %}
     <div class="section-heading" title="{{ tip }}"><span>Existing projects</span> <button type="button" class="tip" aria-label="About existing projects" title="{{ tip }}"><span>i</span></button></div>
     <div id="runs-list" class="runs-list"><div class="activity-empty">&gt; loading projects...</div></div>
   </section>

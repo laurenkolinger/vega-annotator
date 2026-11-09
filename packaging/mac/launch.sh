@@ -1,12 +1,14 @@
 #!/bin/bash
 # Start VEGA Annotator and open it in the browser. macOS stops any process an app leaves
 # behind when the app exits, so launchd runs the home screen as a service. A server older
-# than the installed code is restarted.
+# than the installed code is restarted. The first open asks to download Python, PyTorch and
+# SAM3. A Mac set up by version 1.0, with Python ready and no SAM3, is asked about SAM3 alone.
 APP_NAME="VEGA Annotator"
 LABEL="org.vicar.vega-annotator.home"
 PORT="5050"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PROJECT="$HERE/../Resources/app"
+SETUP="$HERE/../Resources/setup.sh"
 SUPPORT="$HOME/Library/Application Support/$APP_NAME"
 PYTHON="$SUPPORT/runtime/bin/python"
 LOG="$SUPPORT/logs/home.log"
@@ -37,18 +39,28 @@ runtime_ready() {
   [ -x "$PYTHON" ] && cat "$PROJECT/requirements/base.txt" "$PROJECT/requirements/mac.txt" | cmp -s - "$SUPPORT/runtime/.complete"
 }
 
+# Say where SAM3 stands: installed, downloading, failed or missing. The app's own downloader
+# answers, so the launcher and the home screen read SAM3 the same way.
+sam3_state() { (cd "$PROJECT" && "$PYTHON" -m vega_annotator.sam3_download --status) 2> /dev/null; }
+
 if [ "$(uname -m)" != "arm64" ]; then
   alert "This Mac has an Intel processor. PyTorch 2.11, which SAM3 needs, runs only on Macs with Apple chips."
   exit 1
 fi
 
 if ! runtime_ready; then
-  osascript -e 'display dialog "VEGA Annotator needs Python and PyTorch. It will download them, up to about 1 GB, into its own folder and tell you each step. This takes a few minutes." with title "Set up VEGA Annotator" buttons {"Cancel", "Download"} default button "Download"' > /dev/null || exit 0
+  osascript -e 'display dialog "VEGA Annotator needs Python, PyTorch and SAM3, about 4.5 GB. It will download them into its own folder and tell you each step. This takes from a few minutes to an hour, depending on the connection." with title "Set up VEGA Annotator" buttons {"Cancel", "Download"} default button "Download"' > /dev/null || exit 0
   # Setup replaces the Python a running server uses, so the server stops first.
   launchctl bootout "$SERVICE" > /dev/null 2>&1
-  if ! /bin/bash "$HERE/../Resources/setup.sh"; then
+  if ! /bin/bash "$SETUP"; then
     alert "Setup could not finish. Check your internet connection and open VEGA Annotator again. The reason is at the end of $HOME/Library/Logs/$APP_NAME install.log."
     exit 1
+  fi
+elif [ "$(sam3_state)" = "missing" ]; then
+  # After a failed download, or while one runs, the launcher does not ask: DOWNLOAD SAM3 on
+  # the home screen is there instead. The app opens whatever the download does.
+  if osascript -e 'display dialog "VEGA Annotator needs SAM3, 3.4 GB, to make masks. It will download it into its own folder and open when it is done. Choose Not Now to open without it and install it later from the home screen." with title "Set up VEGA Annotator" buttons {"Not Now", "Download"} default button "Download" cancel button "Not Now"' > /dev/null; then
+    /bin/bash "$SETUP" --sam3-only
   fi
 fi
 mkdir -p "$SUPPORT/logs" "$(dirname "$AGENT_PLIST")"

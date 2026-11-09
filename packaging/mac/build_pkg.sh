@@ -1,19 +1,24 @@
 #!/bin/bash
-# Build dist/VEGAAnnotator-<version>.pkg, the Mac installer. It holds the app and its source
-# code; the app downloads Python and PyTorch when it first opens, and copies SAM3 from the
-# server folder. This follows Sponge Lab's installer.
+# Build VEGAAnnotator-<version>.pkg, the Mac installer, and print its path. It holds the app
+# and its source code; the app downloads Python, PyTorch and SAM3 when it first opens. The
+# installer shows Meta's SAM License, which the person must accept, because the license
+# binds anyone who uses or passes on SAM3. This follows Sponge Lab's installer.
+# Usage: build_pkg.sh [output folder], with dist/ in the repository as the default.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 VERSION="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); from vega_annotator import VERSION; print(VERSION)' "$ROOT")"
 APP_NAME="VEGA Annotator"
 IDENTIFIER="org.vicar.vega-annotator"
+DIST="${1:-$ROOT/dist}"
+mkdir -p "$DIST"
+DIST="$(cd "$DIST" && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 APP="$WORK/root/$APP_NAME.app"
-OUT="$ROOT/dist/VEGAAnnotator-$VERSION.pkg"
+OUT="$DIST/VEGAAnnotator-$VERSION.pkg"
 
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/app" "$ROOT/dist"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/app"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -58,6 +63,7 @@ cat > "$WORK/distribution.xml" <<XML
 <installer-gui-script minSpecVersion="2">
   <title>$APP_NAME</title>
   <welcome file="welcome.html" mime-type="text/html"/>
+  <license file="SAM_LICENSE.txt"/>
   <conclusion file="conclusion.html" mime-type="text/html"/>
   <domains enable_anywhere="false" enable_currentUserHome="true" enable_localSystem="false"/>
   <options customize="never" require-scripts="false" hostArchitectures="arm64"/>

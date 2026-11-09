@@ -8,3 +8,16 @@
   color: var(--text-dim);
   white-space: nowrap;
 }
+
+/* A project with its own labels (annotator_extras.js marks the page): the label popup
+   offers no reef categories, and every label name stands upright, because these
+   labels are words such as "Partly bleached" and never species names. */
+html.va-custom-labels #cat-popup .cat-btn[onclick*="assignNewMaskCategory('Sponge')"],
+html.va-custom-labels #cat-popup .cat-btn[onclick*="assignNewMaskCategory('Macroalgae')"],
+html.va-custom-labels #cat-popup .cat-btn[onclick*="assignNewMaskCategory('Gorgonian')"],
+html.va-custom-labels #cat-popup .cat-btn[onclick*="assignNewMaskCategory('Turf')"] { display: none; }
+html.va-custom-labels .sci-name { font-style: normal; }
+/* With the four categories gone, Unlabel stands alone, and Unlabel is no category. */
+html.va-custom-labels #cat-popup .cat-head:not(#cat-popup-title) { display: none; }
+/* A custom label's code is the label, so a chip repeating the name beside it goes. */
+html.va-custom-labels .va-repeated-code { display: none; }

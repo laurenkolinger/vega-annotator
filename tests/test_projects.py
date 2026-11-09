@@ -120,3 +120,65 @@ def test_environment_refuses_a_project_with_no_targets(tmp_path):
     project = helpers.make_project(tmp_path, target="")
     with pytest.raises(ValueError):
         projects.annotator_environment(project, PLAN, "u", MODELS)
+
+
+def folder_project(tmp_path, names=("healthy", "Partly bleached", "SCTLD (lesion)")):
+    """Make a project from a folder of two images, in this test's projects folder."""
+    from vega_annotator import folder_projects
+    photos = tmp_path / "photos"
+    helpers.write_image(photos / "a.jpg")
+    helpers.write_image(photos / "b.png")
+    root = tmp_path / "projects"
+    run = folder_projects.create(photos, "Reef health", list(names), "LO", "x", root=root)["run"]
+    return root / run
+
+
+def test_environment_for_folder_project(tmp_path, source_project):
+    project = folder_project(tmp_path)
+    env = projects.annotator_environment(project, PLAN, "http://127.0.0.1:5050", MODELS)
+    assert env["TCRMP_TARGET_SPECIES"] == "healthy,Partly bleached,SCTLD (lesion)"
+    assert env["TCRMP_TARGET_SPECIES_ONLY"] == "0"
+    assert env["TCRMP_MASTER_CODES"] == str(project / "step4test_combinedAnnotate" / "master_codes_recoded.csv")
+    assert env[projects.LABEL_SET_ENV] == "custom" and projects.LABEL_SET_ENV == "VEGA_ANNOTATOR_LABEL_SET"
+    assert env["TCRMP_PROJECT_ID"] == project.name[4:] and env["TCRMP_PROJECT_NAME"] == "Reef health"
+    assert env["TCRMP_REVIEWER"] == "LO" and all(isinstance(value, str) for value in env.values())
+    vega_env = projects.annotator_environment(source_project, PLAN, "u", MODELS)
+    assert projects.LABEL_SET_ENV not in vega_env and vega_env["TCRMP_TARGET_SPECIES_ONLY"] == "1"
+    assert vega_env["TCRMP_MASTER_CODES"].endswith("step2_recodeSpecies/master_codes_recoded.csv")
+
+
+def test_open_in_annotator_reads_the_annotators_page(tmp_path, source_project):
+    from vega_annotator import home
+    assert projects.ANNOTATOR_PORTS == range(home.FIRST_ANNOTATOR_PORT, home.LAST_ANNOTATOR_PORT + 1)
+    template = (helpers.ROOT / "vendor" / "vega" / "scripts" / "TCRMPclip_combinedAnnotate" / "src" /
+                "templates" / "index.html").read_text(encoding="utf-8")
+    assert "const RESUME_EXPORT_DIR = {{ default_export|tojson }};" in template
+    project = folder_project(tmp_path)
+    assert projects.open_in_annotator(project) is False
+    with helpers.AnnotatorPage(project, projects.ANNOTATOR_PORTS):
+        assert projects.open_in_annotator(project) is True
+        assert projects.open_in_annotator(source_project) is False
+    assert projects.open_in_annotator(project) is False
+
+
+def test_count_work_counts_imports_the_store_lacks(tmp_path):
+    project = folder_project(tmp_path)
+    store_path = project / "step4test_combinedAnnotate" / "segmentations" / "segmentations.json"
+    store = json.loads(store_path.read_text(encoding="utf-8"))
+    del store["custom_b.jpg"]
+    store_path.write_text(json.dumps(store, indent=1), encoding="utf-8")
+    work = projects.count_work(project)
+    assert work["frames_total"] == 2 and work["frames_left"] == 2
+    (project / "step4test_combinedAnnotate" / "custom_imports" / "raw" / "custom_b.jpg").unlink()
+    assert projects.count_work(project)["frames_total"] == 1
+    manifest = project / "step4test_combinedAnnotate" / "custom_imports" / "imports_manifest.json"
+    manifest.write_text("{broken", encoding="utf-8")
+    assert projects.count_work(project)["frames_total"] == 1
+
+
+def test_update_project_edits_the_record_under_the_lock(source_project):
+    record = projects.update_project(source_project, lambda data: data.update(description="edited"))
+    assert record["description"] == "edited" == projects.read_project(source_project)["description"]
+    assert projects.has_custom_labels(record) is False
+    assert projects.has_custom_labels({"label_set": {"kind": "custom", "labels": ["a"]}}) is True
+    assert projects.has_custom_labels(None) is False

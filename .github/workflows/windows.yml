@@ -1,8 +1,8 @@
 # Run the real Windows installer and the test suite on a Windows machine. No GPU and no SAM3
 # weights here, so tests that need them skip; the Legion's Test SAM3 button covers those.
+# Release 1.1 is for Macs only, so this runs only when started by hand.
 name: Windows
 on:
-  push:
   workflow_dispatch:
 jobs:
   install-and-test:

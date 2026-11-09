@@ -1,22 +1,26 @@
-"""The SAM3 weights on this computer, and installing them from the server folder.
+"""The SAM3 weights on this computer, installing them from the server folder, and checking a copy.
 
-The server folder holds the checkpoint as plain files in Hugging Face's cache layout
-(refs/main and snapshots/<commit>/), so no symbolic links are needed and Windows reads
-it as Linux does, plus Meta's license and a checksum list. The annotator then loads
-from the local copy with no network and no Hugging Face account.
+A SAM3 copy, in the server folder or unpacked from the lab's GitHub release, holds the
+checkpoint as plain files in Hugging Face's cache layout (refs/main and snapshots/<commit>/),
+so no symbolic links are needed and Windows reads it as Linux does, plus Meta's license and
+a checksum list. The annotator then loads from the local copy with no network and no
+Hugging Face account.
 """
 
+import re
 import shutil
 import uuid
 from pathlib import Path
 
 from . import paths
-from .atomic import read_json_object
+from .atomic import read_json_object, sha256_file
 from .transfer import TransferError, _check_space, copy_verified, safe_rel
 
 CHECKSUMS_NAME = "checksums.json"
 LICENSE_NAME = "SAM_LICENSE.txt"
 WEIGHTS_NAME = "model.safetensors"
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+CHECK_MESSAGE = "Checking SAM3"
 
 
 def installed_snapshot(model_dir=None):
@@ -65,6 +69,68 @@ def server_copy(server_folder):
     return folder if (folder / CHECKSUMS_NAME).is_file() else None
 
 
+def read_listing(folder):
+    """Read a SAM3 copy's checksums.json and check that every entry is usable.
+
+    Parameters:
+        folder: the copy's folder, which holds checksums.json.
+    Returns:
+        dict: each file's path relative to folder, mapped to its size and sha256.
+    Raises:
+        TransferError: when the list is missing, unreadable or empty, or an entry is not
+            a plain relative path with a size and a SHA-256.
+    """
+    try:
+        listing = read_json_object(Path(folder) / CHECKSUMS_NAME)
+    except ValueError as exc:
+        raise TransferError(f"The SAM3 file list cannot be read: {exc}") from exc
+    if not listing:
+        raise TransferError("The SAM3 file list is empty, so the copy cannot be checked.")
+    for rel, entry in listing.items():
+        if (not safe_rel(rel) or not isinstance(entry, dict) or type(entry.get("size")) is not int
+                or entry["size"] < 0 or not SHA256_PATTERN.fullmatch(str(entry.get("sha256")))):
+            raise TransferError(f"The SAM3 file list has a bad entry: {rel!r}")
+    return listing
+
+
+def verify_copy(folder, progress=None):
+    """Check every file in a SAM3 copy against the size and SHA-256 in its checksums.json.
+
+    Parameters:
+        folder: the copy's folder, holding checksums.json and the files it lists.
+        progress: optional callable (bytes checked, bytes total, message).
+    Returns:
+        None.
+    Raises:
+        TransferError: naming the first file that is missing or differs, or when the
+            list itself is unusable.
+    """
+    folder = Path(folder)
+    listing = read_listing(folder)
+    total = sum(entry["size"] for entry in listing.values())
+    done = [0]
+
+    def on_chunk(count):
+        """Report progress for one checked chunk."""
+        done[0] += count
+        if progress:
+            progress(done[0], total, CHECK_MESSAGE)
+
+    for rel, entry in sorted(listing.items()):
+        path = folder / rel
+        if not path.is_file():
+            raise TransferError(f"SAM3's file {rel} is missing.")
+        size = path.stat().st_size
+        if size != entry["size"]:
+            raise TransferError(f"SAM3's file {rel} is {size:,} bytes, and its list says {entry['size']:,}.")
+        try:
+            actual = sha256_file(path, on_chunk)
+        except OSError as exc:
+            raise TransferError(f"SAM3's file {rel} cannot be read: {exc}") from exc
+        if actual != entry["sha256"]:
+            raise TransferError(f"SAM3's file {rel} does not match its checksum.")
+
+
 def install_from_server(server_folder, progress=None):
     """Copy SAM3 from the server folder to this computer, checking every file.
 
@@ -82,13 +148,7 @@ def install_from_server(server_folder, progress=None):
     folder = server_copy(server_folder)
     if folder is None:
         raise TransferError("The server folder holds no copy of SAM3 yet.")
-    try:
-        listing = read_json_object(folder / CHECKSUMS_NAME)
-    except ValueError as exc:
-        raise TransferError(f"The SAM3 file list cannot be read: {exc}") from exc
-    for rel, entry in listing.items():
-        if not safe_rel(rel) or not isinstance(entry, dict) or not isinstance(entry.get("size"), int):
-            raise TransferError(f"The SAM3 file list has a bad entry: {rel!r}")
+    listing = read_listing(folder)
     total = sum(entry["size"] for entry in listing.values())
     home = paths.sam3_home()
     home.mkdir(parents=True, exist_ok=True)
@@ -104,7 +164,7 @@ def install_from_server(server_folder, progress=None):
 
     try:
         for rel, entry in sorted(listing.items()):
-            copy_verified(folder / rel, working / rel, entry.get("sha256"), on_chunk)
+            copy_verified(folder / rel, working / rel, entry["sha256"], on_chunk)
         hf_hub = paths.sam3_model_dir().parent
         hf_hub.mkdir(parents=True, exist_ok=True)
         target = paths.sam3_model_dir()

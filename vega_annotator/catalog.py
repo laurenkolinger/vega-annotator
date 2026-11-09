@@ -15,6 +15,10 @@ Each card says where the project is and what can be done with it now. The states
 - no_server: the server folder is not connected, and the copy here is not held.
 - not_on_server: the server folder is connected and does not hold this project. Work
   here cannot go back until the project is there again.
+- made_here: this computer made the project from a folder of images, and only this computer
+  holds it. It never goes to or comes from the server folder. The card lists its actions:
+  open, add images, labels, export for VEGA, and remove. While its first import is unfinished
+  (creating), it lists only add images, which finishes that import, and remove.
 - error: a record cannot be read. The card says why and offers nothing that would act on it.
 """
 
@@ -23,9 +27,12 @@ import os
 import threading
 from pathlib import Path
 
-from . import paths, projects, transfer
+from . import folder_projects, paths, projects, transfer
 
 SERVER_CHECK_TIMEOUT_S = 4
+MADE_HERE = folder_projects.MADE_HERE
+MADE_HERE_ACTIONS = ("open", "add_images", "labels", "export_for_vega", "remove")
+CREATING_ACTIONS = ("add_images", "remove")
 _listing_sizes = {}
 _AUTODETECT_PATTERNS_MAC = ("/Volumes/*/students/*/VEGA_Annotator",
                             "/Volumes/*/*/students/*/VEGA_Annotator",
@@ -193,6 +200,8 @@ def _classify(run, local_folder, server_folder, computer, connected=False):
         connected: whether the server folder could be listed.
     Returns:
         dict: state, pending_files, holder (or None), server_rev, local_rev, holding, size_bytes, error.
+        A project made here also carries where ("local", since a server project of the same
+        name is another project), creating (its first import is unfinished), and actions.
     """
     info = {"state": "on_server", "pending_files": 0, "unsent_records": False, "holder": None,
             "server_rev": None, "local_rev": None, "holding": False, "error": "",
@@ -211,6 +220,12 @@ def _classify(run, local_folder, server_folder, computer, connected=False):
     if local_folder is None:
         if info["holder"] and info["holder"].get("computer") != computer:
             info["state"] = "held_elsewhere"
+        return info
+    if folder_projects.made_here(local_folder) is not None:
+        creating = folder_projects.creating(local_folder)
+        info.update(state=MADE_HERE, where="local", holder=None, server_rev=None, error="", creating=creating,
+                    size_bytes=transfer.project_size(local_folder),
+                    actions=list(CREATING_ACTIONS if creating else MADE_HERE_ACTIONS))
         return info
     try:
         local_state = transfer.read_local_state(local_folder)

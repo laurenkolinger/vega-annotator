@@ -13,15 +13,19 @@ VERSION="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); from vega_an
 PKG="$ROOT/dist/VEGAAnnotator-$VERSION.pkg"
 ZIP="$ROOT/dist/VEGAAnnotator-$VERSION-Windows.zip"
 
-for file in "$PKG" "$ZIP"; do
-  if [ ! -f "$file" ]; then
-    echo "publish_to_server: $file is missing. Build the installers first." >&2
-    exit 1
-  fi
-done
+if [ ! -f "$PKG" ]; then
+  echo "publish_to_server: $PKG is missing. Build the Mac installer first." >&2
+  exit 1
+fi
+# Release 1.1 is for Macs only. A Windows zip goes out only when one was built for this
+# version; the 1.0.0 zip already in the folder stays for Windows computers.
+INSTALLERS=("$PKG")
+if [ -f "$ZIP" ]; then
+  INSTALLERS+=("$ZIP")
+fi
 
 ssh -o BatchMode=yes "$HOST" "mkdir -p '$DEST/install' '$DEST/sam3' '$DEST/projects'"
-rsync -t "$PKG" "$ZIP" "$HOST:$DEST/install/"
+rsync -t "${INSTALLERS[@]}" "$HOST:$DEST/install/"
 # Through a pipe, because rsync splits a remote path at its space.
 ssh -o BatchMode=yes "$HOST" "cat > '$DEST/START HERE.txt'" < "$ROOT/docs/START_HERE.txt"
 rsync -t "$ROOT/vendor/SAM_LICENSE.txt" "$HOST:$DEST/sam3/SAM_LICENSE.txt"

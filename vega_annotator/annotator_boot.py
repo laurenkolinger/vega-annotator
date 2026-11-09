@@ -8,11 +8,15 @@ differences for a laptop:
 - It listens on 127.0.0.1 and refuses other hosts and web pages. VEGA's launch listens
   on every network interface, which suits the lab machine and not a laptop.
 - It serves VEGA's fonts from local files, so the page looks the same with no internet.
-- It adds the frames-left readout next to the frame counter.
+- It adds the app's page extras: the frames-left readout next to the frame counter and,
+  on a project with its own labels, no reef shortcuts and upright label names. A flag
+  set before the extras, window.VEGA_ANNOTATOR, tells them which label set the project
+  uses.
 """
 
 import argparse
 import atexit
+import json
 import os
 import re
 import signal
@@ -24,6 +28,9 @@ from . import paths, shims
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 TRACKER_DTYPE_ENV = "VEGA_ANNOTATOR_TRACKER_DTYPE"
 THREADS_ENV = "VEGA_ANNOTATOR_THREADS"
+LABEL_SET_ENV = "VEGA_ANNOTATOR_LABEL_SET"
+LABEL_SET_RE = re.compile(r"[a-z_]{1,32}")
+DEFAULT_LABEL_SET = "vega"
 DEFAULT_PORT = 5080
 GOOGLE_FONT_LINK_RE = re.compile(
     r'[ \t]*<link[^>]*(?:fonts\.googleapis\.com|fonts\.gstatic\.com)[^>]*>[ \t]*\n?')
@@ -32,18 +39,33 @@ LOCAL_PAGE_TAIL = ('<link rel="stylesheet" href="/portable/annotator_extras.css"
                    '<script src="/portable/annotator_extras.js" defer></script>\n')
 
 
-def localize_page(html):
-    """Swap the page's Google Fonts links for local ones and add the readout's files.
+def label_set_flag(label_set):
+    """Return the script that tells the page extras which label set the project uses.
+
+    Parameters:
+        label_set: the project's label set, such as "custom"; anything that is not a
+            short lower-case word becomes VEGA's own set, so no value can leave the script.
+    Returns:
+        str: one script element and a new line.
+    """
+    value = label_set if isinstance(label_set, str) and LABEL_SET_RE.fullmatch(label_set) else DEFAULT_LABEL_SET
+    return f"<script>window.VEGA_ANNOTATOR = {json.dumps({'labelSet': value})};</script>\n"
+
+
+def localize_page(html, label_set=None):
+    """Swap the page's Google Fonts links for local ones and add the extras' files.
 
     Parameters:
         html: the annotator page as VEGA renders it.
+        label_set: the project's label set, from VEGA_ANNOTATOR_LABEL_SET.
     Returns:
-        str: the page with local fonts and the extras attached.
+        str: the page with local fonts, the label set flag and the extras attached.
     """
     html, removed = GOOGLE_FONT_LINK_RE.subn("", html)
     if removed:
         html = html.replace("<style>", LOCAL_PAGE_HEAD + "<style>", 1)
-    return html.replace("</body>", LOCAL_PAGE_TAIL + "</body>", 1)
+    tail = label_set_flag(label_set) + LOCAL_PAGE_TAIL if LOCAL_PAGE_TAIL else ""
+    return html.replace("</body>", tail + "</body>", 1)
 
 
 def is_local_request(host_header, origin_header):
@@ -64,12 +86,13 @@ def is_local_request(host_header, origin_header):
     return not origin_header
 
 
-def attach_portable_layer(flask_app, static_dir):
+def attach_portable_layer(flask_app, static_dir, label_set=None):
     """Add the local-only guard, the local fonts, and the extras to VEGA's Flask app.
 
     Parameters:
         flask_app: VEGA's Flask application object.
         static_dir: the folder holding fonts.css and the extras.
+        label_set: the project's label set, which the page extras read.
     Returns:
         None.
     """
@@ -85,7 +108,7 @@ def attach_portable_layer(flask_app, static_dir):
         """Rewrite the annotator page, and drop VEGA's open cross-origin header."""
         response.headers.pop("Access-Control-Allow-Origin", None)
         if request.path == "/" and response.mimetype == "text/html":
-            response.set_data(localize_page(response.get_data(as_text=True)))
+            response.set_data(localize_page(response.get_data(as_text=True), label_set))
         return response
 
     # Flask runs these handlers last registered first, and VEGA's flask_cors handler adds
@@ -170,7 +193,8 @@ def main(argv=None):
 
     dtype_name = os.environ.get(TRACKER_DTYPE_ENV, "bfloat16")
     wrap_tracker_dtype(sam_engine, getattr(torch, dtype_name))
-    attach_portable_layer(vega_app.app, str(paths.app_root() / "vega_annotator" / "static"))
+    attach_portable_layer(vega_app.app, str(paths.app_root() / "vega_annotator" / "static"),
+                          os.environ.get(LABEL_SET_ENV, ""))
 
     print("Loading SAM3 model...", flush=True)
     vega_app.session["sam_engine"] = sam_engine.SAM3Engine(vega_config)

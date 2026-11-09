@@ -1,7 +1,8 @@
 <!doctype html>
 {#- The project window. It copies VEGA's main window: the same stylesheets, top bar, rail,
     and Place + Segment panel. Steps VEGA runs on the mainframe stay on the rail with their
-    real status from project.json. -#}
+    real status from project.json. A project from the server ends the rail with Put Back;
+    a project made here ends it with Labels, Add Images and Export for VEGA. -#}
 {%- macro q(text, about) -%}
 <button type="button" class="tip" aria-label="About {{ about }}" title="{{ text }}"><span aria-hidden="true">?</span></button>
 {%- endmacro -%}
@@ -18,13 +19,17 @@
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/project.css">
 </head>
-<body data-run="{{ run }}" data-project-loaded="true">
+<body data-run="{{ run }}" data-made-here="{{ 'true' if made_here else 'false' }}" data-project-loaded="true">
 <div class="topbar">
   <div style="display:flex;align-items:center;gap:10px">
     <h1>VEGA</h1>
+    {%- if made_here %}
+    {{ sec("VEGA Annotator runs VEGA's annotator on this computer. This project came from a folder of images, so it skipped Steps 1 to 3, and VEGA runs Steps 5 to 7 on the mainframe from the folder EXPORT FOR VEGA writes.", "this window") }}
+    {%- else %}
     {{ sec("VEGA Annotator runs VEGA's annotator on this computer. Steps 1 to 3 and 5 to 7 stay on the mainframe, and this project's records keep their status here.", "this window") }}
+    {%- endif %}
     <span class="topbar-chain" title="A project reads the survey point counts (CVR), pulls the matching video still frames (CLIP), segments each organism with SAM3, then trains and runs a YOLO11 segmentation model.">CVR -&gt; CLIP -&gt; SAM3 -&gt; YOLO11</span>
-    <span class="project-name" id="topbar-project-name" title="VEGA names a project from its initials, target labels, image count, and date created."></span>
+    <span class="project-name" id="topbar-project-name" title="{{ 'The person who made this project named it in NEW PROJECT.' if made_here else 'VEGA names a project from its initials, target labels, image count, and date created.' }}"></span>
   </div>
   <div class="topbar-actions">
     <button class="btn btn-outline btn-sm" id="open-project-folder" title="Show this project's Place + Segment folder in the file manager.">Open Project Folder</button>
@@ -41,8 +46,15 @@
       <li data-step="6"><div class="step-circle">5</div><div class="step-info"><div class="step-title">Train Model</div><div class="step-status" id="status-6">locked</div></div></li>
       <li data-step="7"><div class="step-circle">6</div><div class="step-info"><div class="step-title">Evaluate Model</div><div class="step-status" id="status-7">locked</div></div></li>
       <li data-step="8"><div class="step-circle">7</div><div class="step-info"><div class="step-title">Model Inference</div><div class="step-status" id="status-8">locked</div></div></li>
+      {%- if made_here %}
+      <li class="nav-section" aria-hidden="true" style="pointer-events:none;padding-top:14px;margin-top:8px;border-top:1px solid rgba(255,255,255,0.08)"><div class="step-info"><div class="step-title">This project</div></div></li>
+      <li data-step="labels" title="See this project's labels and add more."><div class="step-circle">#</div><div class="step-info"><div class="step-title">Labels</div><div class="step-status" id="status-labels">checking</div></div></li>
+      <li data-step="addimages" title="Copy more images into this project."><div class="step-circle">+</div><div class="step-info"><div class="step-title">Add Images</div><div class="step-status" id="status-addimages">checking</div></div></li>
+      <li data-step="export" title="Write the exported frames to one folder VEGA trains from."><div class="step-circle">&#8681;</div><div class="step-info"><div class="step-title">Export for VEGA</div><div class="step-status" id="status-export">checking</div></div></li>
+      {%- else %}
       <li class="nav-section" aria-hidden="true" style="pointer-events:none;padding-top:14px;margin-top:8px;border-top:1px solid rgba(255,255,255,0.08)"><div class="step-info"><div class="step-title">Server folder</div></div></li>
       <li data-step="putback"><div class="step-circle">&#8679;</div><div class="step-info"><div class="step-title">Put Back</div><div class="step-status" id="status-putback">checking</div></div></li>
+      {%- endif %}
     </ul>
   </div>
 
@@ -61,6 +73,7 @@
           {{ sec("Step 4 folds point placement and segmentation into one pass: click an organism and SAM3 makes its mask on the spot.", "Place + Segment") }}
         </div>
         <div class="batch-readout" id="frames-readout" title="VEGA Annotator counts the project's frames: not yet exported, exported, and scrapped."></div>
+        {%- if not made_here %}
         <div class="checkbox-group">
           {%- set t = "Limit the annotation session and its export to frames carrying a label from Step 3's target list, on by default. Untick it to take every routed frame." -%}
           <div class="field-head"><span class="field-label">Frames to annotate</span>{{ q(t, "the target-label limit") }}</div>
@@ -71,6 +84,7 @@
           <div class="field-head"><span class="field-label">Survey points</span>{{ q(t, "the read-only guide") }}</div>
           <label class="opt" for="s4test-reference"><input type="checkbox" id="s4test-reference" checked title="{{ t }}"> Show existing points as a read-only guide</label>
         </div>
+        {%- endif %}
         <div class="form-row">
           <div class="form-group">
             {%- set t = "Choose how many frames the annotator loads before it offers to export, 10 by default. VEGA Annotator applies a change here at the next Open." -%}
@@ -102,6 +116,72 @@
       </div>
     </div>
 
+    {%- if made_here %}
+    <div class="step-panel" id="panel-labels">
+      <div class="card">
+        <div class="panel-head">
+          <h2>Labels</h2>
+          {{ sec("The annotator offers these labels, in this order: keys 1 to 9 pick the first nine. VEGA numbers its classes in this order, so after the first export a label can be added but never renamed or removed.", "Labels") }}
+        </div>
+        <div id="labels-editor"></div>
+      </div>
+    </div>
+
+    <div class="step-panel" id="panel-addimages">
+      <div class="card">
+        <div class="panel-head">
+          <h2>Add Images</h2>
+          {{ sec("ADD IMAGES copies another folder of images into this project as new frames, through VEGA's own import code. It works while the annotator is closed on this project.", "Add Images") }}
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            {%- set t = "Pick the folder that holds the images. VEGA Annotator also looks in its subfolders, and leaves the folder as it is." -%}
+            <div class="field-head"><span class="field-label">Image folder</span>{{ q(t, "the image folder") }}</div>
+            <div class="field-row va-folder-row"><span id="add-folder" class="va-path va-path-empty">No folder chosen</span><button class="btn btn-outline btn-sm" id="add-folder-btn" title="Open the folder chooser. VEGA Annotator then looks through the folder and says what it found.">CHOOSE FOLDER</button></div>
+          </div>
+          <div class="form-group">
+            {%- set t = "Type your initials, 1 to 4 letters. They sign the project's log for these images." -%}
+            <div class="field-head"><label for="add-initials">Initials</label>{{ q(t, "the initials") }}</div>
+            <input type="text" id="add-initials" class="va-initials" maxlength="4" autocomplete="off" title="{{ t }}">
+          </div>
+        </div>
+        <div id="add-summary" class="va-result" aria-live="polite"></div>
+        <div class="btn-group panel-actions">
+          <button class="btn btn-magenta" id="add-images-btn" title="VEGA Annotator copies the images in this folder into the project.">ADD IMAGES</button>
+        </div>
+        <div id="add-progress" class="va-progress" style="display:none"><div class="va-progress-bar"></div></div>
+        <div id="add-result" class="va-result" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div class="step-panel" id="panel-export">
+      <div class="card">
+        <div class="panel-head">
+          <h2>Export for VEGA</h2>
+          {{ sec("EXPORT FOR VEGA writes one new folder, named after the project and the time, with every exported frame, its masks and its labels. VEGA's operator copies that folder to the mainframe and trains it in its own training project.", "Export for VEGA") }}
+        </div>
+        <div class="batch-readout" id="export-readout"></div>
+        <div class="form-row">
+          <div class="form-group">
+            {%- set t = "Pick where the new folder goes: a USB drive, a shared drive, or any folder." -%}
+            <div class="field-head"><span class="field-label">Destination</span>{{ q(t, "the destination") }}</div>
+            <div class="field-row va-folder-row"><span id="export-folder" class="va-path va-path-empty">No folder chosen</span><button class="btn btn-outline btn-sm" id="export-folder-btn" title="Open the folder chooser to pick where the new folder goes.">CHOOSE FOLDER</button></div>
+            <div id="export-free" class="va-dim va-free"></div>
+          </div>
+          <div class="checkbox-group">
+            {%- set t = "Add the original image files, as they came in. VEGA trains on the working copies, so the folder works without them." -%}
+            <div class="field-head"><span class="field-label">Originals</span>{{ q(t, "including originals") }}</div>
+            <label class="opt" for="export-originals"><input type="checkbox" id="export-originals" title="{{ t }}"> Include originals <span id="export-originals-size" class="va-dim"></span></label>
+          </div>
+        </div>
+        <div class="btn-group panel-actions">
+          <button class="btn btn-magenta" id="export-btn" title="VEGA Annotator writes the new folder for VEGA.">EXPORT FOR VEGA</button>
+        </div>
+        <div id="export-progress" class="va-progress" style="display:none"><div class="va-progress-bar"></div></div>
+        <div id="export-result" class="va-result" aria-live="polite"></div>
+      </div>
+    </div>
+    {%- else %}
     <div class="step-panel" id="panel-putback">
       <div class="card">
         <div class="panel-head">
@@ -116,6 +196,7 @@
         <div id="putback-result" class="va-result"></div>
       </div>
     </div>
+    {%- endif %}
   </div>
 </div>
 

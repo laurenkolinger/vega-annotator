@@ -97,3 +97,66 @@ def test_portable_layer_guards_rewrites_and_serves(tmp_path):
     assert "Access-Control-Allow-Origin" not in client.get("/data", base_url="http://127.0.0.1:5080").headers
     assert client.get("/data", base_url="http://evil.example").status_code == 403
     assert client.get("/data", base_url="http://127.0.0.1:5080", headers={"Origin": "https://evil.example"}).status_code == 403
+
+
+def test_boot_page_carries_label_set_flag():
+    """The flag sits before the extras script, and defaults to VEGA's own label set."""
+    page = TEMPLATE.read_text(encoding="utf-8")
+    local = boot.localize_page(page, "custom")
+    flag = '<script>window.VEGA_ANNOTATOR = {"labelSet": "custom"};</script>'
+    assert local.count(flag) == 1
+    assert local.index(flag) < local.index("/portable/annotator_extras.js") < local.rindex("</body>")
+    assert '{"labelSet": "vega"}' in boot.localize_page(page)
+    assert '{"labelSet": "vega"}' in boot.localize_page(page, "")
+
+
+@pytest.mark.parametrize("value", ["</script><script>alert(1)</script>", 'custom"};alert(1);//', "CUSTOM",
+                                   "custom ", "x" * 40, None, 7])
+def test_label_set_flag_cannot_leave_its_script(value):
+    """Any value that is not a short lower-case word becomes VEGA's set."""
+    flag = boot.label_set_flag(value)
+    assert flag == '<script>window.VEGA_ANNOTATOR = {"labelSet": "vega"};</script>\n'
+
+
+def test_plain_page_gets_no_flag(monkeypatch):
+    """With the extras switched off, the page gets nothing at all."""
+    monkeypatch.setattr(boot, "LOCAL_PAGE_TAIL", "")
+    page = "<html><body><p>x</p></body></html>"
+    assert boot.localize_page(page, "custom") == page
+
+
+def test_portable_layer_serves_the_flag_from_the_environment(tmp_path):
+    """The served page carries the label set the boot was given."""
+    from flask import Flask
+
+    app = Flask(__name__)
+
+    @app.route("/")
+    def page():
+        return "<html><head><style></style></head><body></body></html>"
+
+    boot.attach_portable_layer(app, str(tmp_path), "custom")
+    html = app.test_client().get("/", base_url="http://127.0.0.1:5080").get_data(as_text=True)
+    assert 'window.VEGA_ANNOTATOR = {"labelSet": "custom"}' in html
+
+
+def test_extras_name_the_four_reef_shortcuts_and_their_keys():
+    """The extras name the four chips VEGA's page draws, and use the capture phase."""
+    script = (ROOT / "vega_annotator" / "static" / "annotator_extras.js").read_text(encoding="utf-8")
+    style = (ROOT / "vega_annotator" / "static" / "annotator_extras.css").read_text(encoding="utf-8")
+    for category in ("Sponge", "Macroalgae", "Gorgonian", "Turf"):
+        assert f"assignNewMaskCategory('{category}')" in style
+    assert "VEGA_ANNOTATOR" in script and '"custom"' in script and ", true)" in script
+    assert "font-style: normal" in style
+    for page_file in ("annotator_extras.js", "annotator_extras.css"):
+        assert "—" not in (ROOT / "vega_annotator" / "static" / page_file).read_text(encoding="utf-8")
+
+
+def test_the_reef_shortcuts_the_extras_hide_still_exist_in_vegas_page():
+    """VEGA's page still holds what the extras hide, so a VEGA update cannot slip past them."""
+    page = TEMPLATE.read_text(encoding="utf-8")
+    for category, key in (("Sponge", "s"), ("Macroalgae", "m"), ("Gorgonian", "g"), ("Turf", "t")):
+        assert f"""<div class="cat-btn" onclick="assignNewMaskCategory('{category}')"><kbd>{key}</kbd>""" in page
+    assert "const catKeys = {s:'Sponge', m:'Macroalgae', g:'Gorgonian', t:'Turf'};" in page
+    assert "let pendingAddMaskIdx" in page and "let pendingScanCandidateIdx" in page
+    assert ".sci-name { font-style: italic; }" in page

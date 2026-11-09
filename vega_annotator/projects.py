@@ -8,8 +8,10 @@ its project cards, and the annotator's settings follow VEGA's launch.
 import csv
 import json
 import os
+import re
 import tempfile
 import threading
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -24,11 +26,24 @@ RAIL_STAGES = (("1", "Fetch Points"), ("2", "Fetch Labels"), ("3", "Choose Image
 CARD_STAGE_KEYS = ("1", "2", "3", "6", "7", "8")
 MASTER_CODES_REL = "step2_recodeSpecies/master_codes_recoded.csv"
 PROMPTS_REL = f"{STEP4_DIR}/routed_input/ids/sam_click_prompts.json"
+IMPORTS_MANIFEST_REL = f"{STEP4_DIR}/custom_imports/imports_manifest.json"
 LOCK_NAME = ".project.json.lock"
 DEFAULT_BATCH_SIZE = "10"
+# A project made from a folder has its own label set. Its label table sits in the Place +
+# Segment folder, the first place VEGA's annotator looks for one.
+CUSTOM_LABEL_SET = "custom"
+CUSTOM_CODES_REL = f"{STEP4_DIR}/master_codes_recoded.csv"
+LABEL_SET_ENV = "VEGA_ANNOTATOR_LABEL_SET"
+# The home screen starts its annotator on the first free port of 5080 to 5089
+# (home.FIRST_ANNOTATOR_PORT to home.LAST_ANNOTATOR_PORT).
+ANNOTATOR_PORTS = range(5080, 5090)
+ANNOTATOR_PROBE_TIMEOUT_S = 1.0
+ANNOTATOR_PAGE_MAX_BYTES = 4 * 1024 * 1024
+# VEGA's annotator page names the folder it saves into in this line (index.html).
+EXPORT_DIR_LINE_RE = re.compile(r'const RESUME_EXPORT_DIR = ("(?:[^"\\]|\\.)*");')
 
 _file_lock = threading.Lock()
-_store_cache = {}
+_json_cache = {}
 
 
 def now_ast():
@@ -65,6 +80,82 @@ def _write_project(project_dir, data):
         except OSError:
             pass
         raise
+
+
+def update_project(project_dir, change):
+    """Read project.json, let change edit it, and write it back, under the app's record lock.
+
+    Parameters:
+        project_dir: the run_* folder.
+        change: a callable given the record (a dict) to edit in place.
+    Returns:
+        dict: the record as written.
+    Raises:
+        ValueError: when project.json is missing or malformed.
+        OSError: when it cannot be written.
+    """
+    with _file_lock:
+        data = read_project(project_dir)
+        change(data)
+        _write_project(project_dir, data)
+    return data
+
+
+def with_record_lock(function, *args, **kwargs):
+    """Run a function that rewrites project.json by itself, such as VEGA's record_in_project,
+    under the same lock as this module's own writers.
+
+    Parameters:
+        function: the callable.
+        args, kwargs: its arguments.
+    Returns:
+        Whatever the function returns.
+    """
+    with _file_lock:
+        return function(*args, **kwargs)
+
+
+def has_custom_labels(project):
+    """Say whether a project uses labels a person defined, as a project made from a folder does.
+
+    Parameters:
+        project: the project record.
+    Returns:
+        bool: True when label_set.kind is "custom".
+    """
+    label_set = project.get("label_set") if isinstance(project, dict) else None
+    return isinstance(label_set, dict) and label_set.get("kind") == CUSTOM_LABEL_SET
+
+
+def open_in_annotator(project_dir):
+    """Say whether a running annotator has this project open.
+
+    The home screen starts VEGA's annotator on one of ANNOTATOR_PORTS, and VEGA's page
+    names the folder that annotator saves into. Asking each port finds an annotator this
+    app started, and one left running by an earlier session of the app.
+
+    Parameters:
+        project_dir: the run_* folder.
+    Returns:
+        bool: True when an annotator on this computer serves the project.
+    """
+    wanted = os.path.realpath(Path(project_dir) / STEP4_DIR)
+    for port in ANNOTATOR_PORTS:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=ANNOTATOR_PROBE_TIMEOUT_S) as answer:
+                page = answer.read(ANNOTATOR_PAGE_MAX_BYTES).decode("utf-8", errors="replace")
+        except (OSError, ValueError):
+            continue
+        match = EXPORT_DIR_LINE_RE.search(page)
+        if not match:
+            continue
+        try:
+            served = json.loads(match.group(1))
+        except ValueError:
+            continue
+        if isinstance(served, str) and served and os.path.realpath(served) == wanted:
+            return True
+    return False
 
 
 def stamp_access(project_dir, initials, action, purpose):
@@ -173,6 +264,30 @@ def read_label_names(project_dir):
     return names
 
 
+def _read_json_cached(path):
+    """Read a JSON object file, reusing the last parse while the file is unchanged.
+
+    Parameters:
+        path: the file.
+    Returns:
+        dict: the object; {} when the file does not exist.
+    Raises:
+        ValueError: when the file exists and is malformed.
+    """
+    path = Path(path)
+    try:
+        stat = path.stat()
+    except OSError:
+        return {}
+    key = (str(path), stat.st_size, stat.st_mtime_ns)
+    cached = _json_cache.get(str(path))
+    if cached and cached[0] == key:
+        return cached[1]
+    data = read_json_object(path)
+    _json_cache[str(path)] = (key, data)
+    return data
+
+
 def _read_store(project_dir):
     """Read segmentations.json, reusing the last parse while the file is unchanged.
 
@@ -181,18 +296,36 @@ def _read_store(project_dir):
     Raises:
         ValueError: when the file exists and is malformed.
     """
-    path = Path(project_dir) / SEGMENTATIONS_REL
+    return _read_json_cached(Path(project_dir) / SEGMENTATIONS_REL)
+
+
+def _queued_import_frames(project_dir, store):
+    """Count imported images VEGA has not yet added to the store.
+
+    VEGA's annotator adds every entry of custom_imports/imports_manifest.json that the store
+    lacks, when its image is on disk, as it opens (_merge_custom_imports). An import that
+    stopped before its frames were saved leaves such entries.
+
+    Parameters:
+        project_dir: the run_* folder.
+        store: the frame store.
+    Returns:
+        int: how many frames the annotator will add.
+    """
     try:
-        stat = path.stat()
-    except OSError:
-        return {}
-    key = (str(path), stat.st_size, stat.st_mtime_ns)
-    cached = _store_cache.get(str(path))
-    if cached and cached[0] == key:
-        return cached[1]
-    store = read_json_object(path)
-    _store_cache[str(path)] = (key, store)
-    return store
+        entries = _read_json_cached(Path(project_dir) / IMPORTS_MANIFEST_REL).get("imports")
+    except ValueError:
+        return 0
+    export_dir = Path(project_dir) / STEP4_DIR
+    count = 0
+    for entry in entries if isinstance(entries, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        name, delivered = entry.get("filename"), entry.get("delivered_file")
+        if isinstance(name, str) and name and name not in store and isinstance(delivered, str) \
+                and delivered and (export_dir / delivered).is_file():
+            count += 1
+    return count
 
 
 def _queued_prompt_frames(project_dir, store, codes):
@@ -226,7 +359,9 @@ def count_work(project_dir, project=None):
     Returns:
         dict: frames_total, frames_exported, frames_scrapped, frames_left,
         n_masks and n_images (accepted masks and the frames holding them),
-        species ({code: accepted masks}), and reviewers (sorted initials).
+        species ({code or label: accepted masks}), and reviewers (sorted initials).
+        Frames the annotator adds as it opens count as left: routed frames with a
+        target point, and imported images the store lacks.
     Raises:
         ValueError: when segmentations.json is malformed.
     """
@@ -256,7 +391,8 @@ def count_work(project_dir, project=None):
             who = str(mask.get("reviewer") or "").strip().upper()
             if who:
                 reviewers.add(who)
-    queued = _queued_prompt_frames(project_dir, store, set(target_codes(project)))
+    queued = (_queued_prompt_frames(project_dir, store, set(target_codes(project)))
+              + _queued_import_frames(project_dir, store))
     return {"frames_total": exported + scrapped + left + queued, "frames_exported": exported,
             "frames_scrapped": scrapped, "frames_left": left + queued, "n_masks": n_masks,
             "n_images": len(images), "species": species, "reviewers": sorted(reviewers)}
@@ -286,8 +422,9 @@ def describe(project_dir):
     Parameters:
         project_dir: the run_* folder, on this computer or on the server.
     Returns:
-        dict: the fields the home screen shows. A project that cannot be read
-        carries "error" with the reason and only its folder name besides.
+        dict: the fields the home screen shows, with origin_folder naming the folder a
+        project made here came from ("" for VEGA's projects). A project that cannot be
+        read carries "error" with the reason and only its folder name besides.
     """
     project_dir = Path(project_dir)
     base = {"run": project_dir.name}
@@ -300,6 +437,7 @@ def describe(project_dir):
     names = read_label_names(project_dir)
     codes = target_codes(project)
     log = project.get("access_log") if isinstance(project.get("access_log"), list) else []
+    origin = project.get("origin") if isinstance(project.get("origin"), dict) else {}
     return {**base, **work,
             "project_id": project.get("id") or project_dir.name,
             "project_name": project.get("name") or project_dir.name,
@@ -312,6 +450,7 @@ def describe(project_dir):
             "target_labels": [{"code": code, "name": names.get(code, "")} for code in codes],
             "label_names": names,
             "last_access": log[-1] if log else None,
+            "origin_folder": str(origin.get("folder") or "") if origin.get("kind") == "folder" else "",
             "steps": {key: ((project.get("steps") or {}).get(key) or {}).get("status", "locked")
                       for key, _name in RAIL_STAGES if key != "step4test"}}
 
@@ -339,13 +478,19 @@ def annotator_environment(project_dir, plan, home_url, model_paths, batch_size=N
     project's identity and paths, its target labels, and its Step 5 SAM3 settings.
     The devices come from the plan for this computer.
 
+    A project made from a folder carries its own labels: they become the target labels,
+    the session keeps every frame (its images carry no survey points to select by), the
+    label table is the project's own, and VEGA_ANNOTATOR_LABEL_SET tells the page's
+    extras that the labels are custom words.
+
     Parameters:
         project_dir: the working copy's run_* folder.
         plan: a device.DevicePlan.
         home_url: the home screen's address, where the annotator's Done button goes.
         model_paths: a dict with hf_home and cache_dir.
         batch_size: "5", "10", "20" or "all"; None uses the project's setting.
-        target_only: limit the session to frames carrying a target label.
+        target_only: limit the session to frames carrying a target label. A project
+            made from a folder always keeps every frame.
         reference: show the survey points as a read-only guide.
     Returns:
         dict: environment variables, all strings.
@@ -357,6 +502,7 @@ def annotator_environment(project_dir, plan, home_url, model_paths, batch_size=N
     codes = target_codes(project)
     if not codes:
         raise ValueError(f"{project_dir.name} has no target labels in its Step 3 settings.")
+    custom = has_custom_labels(project)
     export_dir = project_dir / STEP4_DIR
     step5 = ((project.get("steps") or {}).get("5") or {}).get("config") or {}
     env = {
@@ -367,7 +513,7 @@ def annotator_environment(project_dir, plan, home_url, model_paths, batch_size=N
         "TCRMP_PROJECT_ID": str(project.get("id") or project_dir.name),
         "TCRMP_PROJECT_NAME": str(project.get("name") or project_dir.name),
         "TCRMP_TARGET_SPECIES": ",".join(codes),
-        "TCRMP_TARGET_SPECIES_ONLY": "1" if target_only else "0",
+        "TCRMP_TARGET_SPECIES_ONLY": "1" if target_only and not custom else "0",
         "TCRMP_REFERENCE_DEFAULT": "1" if reference else "0",
         "TCRMP_REVIEW_BATCH_SIZE": str(batch_size or step5.get("review_batch_size") or DEFAULT_BATCH_SIZE),
         "TCRMP_SAM3_DEVICE_TRACKER": plan.tracker,
@@ -395,7 +541,9 @@ def annotator_environment(project_dir, plan, home_url, model_paths, batch_size=N
         value = step5.get(key)
         if value not in (None, ""):
             env[name] = str(value)
-    codes_file = project_dir / MASTER_CODES_REL
+    codes_file = project_dir / (CUSTOM_CODES_REL if custom else MASTER_CODES_REL)
     if codes_file.is_file():
         env["TCRMP_MASTER_CODES"] = str(codes_file)
+    if custom:
+        env[LABEL_SET_ENV] = CUSTOM_LABEL_SET
     return env

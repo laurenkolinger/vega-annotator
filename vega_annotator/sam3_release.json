@@ -1,0 +1,22 @@
+{
+  "tag": "sam3-weights-1",
+  "base_url": "https://github.com/laurenkolinger/vega-annotator/releases/download/sam3-weights-1",
+  "snapshot_commit": "3c879f39826c281e95690f02c7821c4de09afae7",
+  "parts": [
+    {
+      "name": "sam3-hf.tar.part1",
+      "size": 1887436800,
+      "sha256": "5b8694330567d3b8553eb0ee263ecf8d2fa4c9829e164e15f78976124bdf220c"
+    },
+    {
+      "name": "sam3-hf.tar.part2",
+      "size": 1557596160,
+      "sha256": "3763349eef5f27919f5ec0c48a1af117939c5c5349ca3257e4c3a97d9b16a794"
+    }
+  ],
+  "license": {
+    "name": "SAM_LICENSE.txt",
+    "size": 7353,
+    "sha256": "4dea99bfaa016e21bc860d73f344236bd1e5c4977d1a9a8fd32f822b500ae1be"
+  }
+}
