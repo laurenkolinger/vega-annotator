@@ -10,17 +10,23 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOST="${VEGA_PUBLISH_HOST:-vicar-mainframe}"
 DEST="${VEGA_PUBLISH_DEST:?Set VEGA_PUBLISH_DEST to the VEGA_Annotator folder on the mainframe.}"
 VERSION="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); from vega_annotator import VERSION; print(VERSION)' "$ROOT")"
-PKG="$ROOT/dist/VEGAAnnotator-$VERSION.pkg"
-ZIP="$ROOT/dist/VEGAAnnotator-$VERSION-Windows.zip"
+DIST="${VEGA_PUBLISH_DIST:-$ROOT/dist}"
+PKG="$DIST/VEGAAnnotator-$VERSION.pkg"
+ZIP="$DIST/VEGAAnnotator-$VERSION-Windows.zip"
 
 if [ ! -f "$PKG" ]; then
   echo "publish_to_server: $PKG is missing. Build the Mac installer first." >&2
   exit 1
 fi
-# Release 1.1 is for Macs only. A Windows zip goes out only when one was built for this
-# version; the 1.0.0 zip already in the folder stays for Windows computers.
+# Release 1.1 is for Macs only. A Windows zip goes out only when VEGA_PUBLISH_WINDOWS=1 asks
+# for it, so a zip a test run left in dist/ never reaches a student's folder. The 1.0.0 zip
+# already in the folder stays for Windows computers.
 INSTALLERS=("$PKG")
-if [ -f "$ZIP" ]; then
+if [ "${VEGA_PUBLISH_WINDOWS:-0}" = "1" ]; then
+  if [ ! -f "$ZIP" ]; then
+    echo "publish_to_server: $ZIP is missing. Build the Windows installer first." >&2
+    exit 1
+  fi
   INSTALLERS+=("$ZIP")
 fi
 

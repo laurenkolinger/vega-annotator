@@ -418,8 +418,12 @@ def test_pkg_shows_the_sam_license(tmp_path):
 def test_windows_zip_holds_everything_setup_copies(tmp_path):
     subprocess.run([sys.executable, str(ROOT / "packaging" / "windows" / "build_zip.py")], check=True, capture_output=True)
     path = ROOT / "dist" / f"VEGAAnnotator-{VERSION}-Windows.zip"
-    with zipfile.ZipFile(path) as archive:
-        names = set(archive.namelist())
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = set(archive.namelist())
+    finally:
+        # The test leaves no zip in dist/, where a publish could pick it up.
+        path.unlink(missing_ok=True)
     top = "VEGA Annotator Installer/"
     for needed in ("Install VEGA Annotator.cmd", "setup.ps1", "VEGA Annotator.vbs", "icon.ico",
                    "vega_annotator/home.py", "vega_annotator/static/fonts.css",
@@ -505,3 +509,46 @@ def test_start_here_and_the_installer_say_what_setup_takes():
     assert "about 20 minutes" not in start_here
     conclusion = (ROOT / "packaging" / "mac" / "resources" / "conclusion.html").read_text(encoding="utf-8")
     assert "<p>It opens now and asks to download what it needs, about 4.5 GB.</p>" in conclusion
+
+
+def run_publish(tmp_path, with_zip=True, **env_extra):
+    """Run tools/publish_to_server.sh with stand-in ssh and rsync, and return (result, the calls they logged)."""
+    dist = tmp_path / "dist"
+    dist.mkdir(parents=True)
+    (dist / f"VEGAAnnotator-{VERSION}.pkg").write_bytes(b"pkg")
+    if with_zip:
+        (dist / f"VEGAAnnotator-{VERSION}-Windows.zip").write_bytes(b"zip")
+    stubs = tmp_path / "bin"
+    stubs.mkdir()
+    log = tmp_path / "calls.log"
+    (stubs / "ssh").write_text(f'#!/bin/bash\necho "ssh $*" >> "{log}"\ncat > /dev/null\n', encoding="utf-8")
+    (stubs / "rsync").write_text(f'#!/bin/bash\necho "rsync $*" >> "{log}"\n', encoding="utf-8")
+    for stub in stubs.iterdir():
+        stub.chmod(0o755)
+    env = {**os.environ, "PATH": f"{stubs}:{os.environ['PATH']}", "VEGA_PUBLISH_DEST": "/fake/VEGA_Annotator",
+           "VEGA_PUBLISH_DIST": str(dist), **env_extra}
+    if "VEGA_PUBLISH_WINDOWS" not in env_extra:
+        env.pop("VEGA_PUBLISH_WINDOWS", None)
+    result = subprocess.run(["/bin/bash", str(ROOT / "tools" / "publish_to_server.sh")], env=env,
+                            stdin=subprocess.DEVNULL, capture_output=True, text=True, check=False)
+    calls = log.read_text(encoding="utf-8") if log.exists() else ""
+    return result, calls
+
+
+def test_publish_sends_only_the_mac_installer_unless_windows_is_asked_for(tmp_path):
+    """A Windows zip a test run left in dist/ never reaches a student's folder; VEGA_PUBLISH_WINDOWS=1 sends it."""
+    result, calls = run_publish(tmp_path / "default")
+    assert result.returncode == 0, result.stderr
+    installers = [line for line in calls.splitlines() if line.startswith("rsync") and "/install/" in line]
+    assert len(installers) == 1 and f"VEGAAnnotator-{VERSION}.pkg" in installers[0] and ".zip" not in installers[0]
+    result, calls = run_publish(tmp_path / "windows", VEGA_PUBLISH_WINDOWS="1")
+    assert result.returncode == 0, result.stderr
+    assert f"VEGAAnnotator-{VERSION}-Windows.zip" in calls
+
+
+def test_publish_refuses_a_missing_windows_zip_when_asked_for_it(tmp_path):
+    """Asking for Windows with no zip built stops before anything is sent, with a sentence."""
+    result, calls = run_publish(tmp_path, with_zip=False, VEGA_PUBLISH_WINDOWS="1")
+    assert result.returncode == 1
+    assert "Build the Windows installer first." in result.stderr
+    assert "rsync" not in calls
